@@ -612,5 +612,5 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-const port = parseInt(process.env.PORT || "0") || (() => { try { return loadConfig().port; } catch { return 3000; } })();
+const port = (process.env.PORT && parseInt(process.env.PORT)) || (() => { try { return loadConfig().port; } catch { return 3000; } })();
 server.listen(port, () => console.log("NOIR v3 multi-provider -> http://localhost:" + port));
