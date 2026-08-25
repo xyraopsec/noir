@@ -350,8 +350,10 @@ button { font-family: inherit; }
 #voiceBtn.listening { animation:micPulse 1.2s ease-in-out infinite; background:rgba(213,150,88,.18) !important; color:#d59658 !important; }
 #voiceBtn.listening::after { content:""; position:absolute; inset:-3px; border-radius:inherit;
   border:2px solid rgba(213,150,88,.35); animation:micRing 1.2s ease-in-out infinite; }
+#voiceBtn.processing { animation:spin 1s linear infinite; color:#d59658 !important; }
 @keyframes micPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.08); } }
 @keyframes micRing { 0%,100% { opacity:.3; transform:scale(1); } 50% { opacity:.8; transform:scale(1.15); } }
+@keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
 
 /* ================= splash ================= */
 #splash { position: fixed; inset: 0; z-index: 300; background: #000;

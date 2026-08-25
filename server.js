@@ -513,6 +513,82 @@ async function handleTitle(req, res) {
   } catch { res.writeHead(500).end(); }
 }
 
+/* ---------------- transcribe (Groq Whisper) ---------------- */
+async function handleTranscribe(req, res) {
+  try {
+    const cfg = loadConfig();
+    const groqKey = (cfg.providers?.groq || {}).key;
+    if (!groqKey) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Groq API-Schlüssel nicht konfiguriert" }));
+      return;
+    }
+
+    // Collect raw body (audio blob)
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const audioBuf = Buffer.concat(chunks);
+
+    if (audioBuf.length < 100) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Aufnahme zu kurz" }));
+      return;
+    }
+
+    // Determine content type from query param or default to webm
+    const u = new URL(req.url, "http://x");
+    const ext = u.searchParams.get("fmt") || "webm";
+    const mimeMap = { webm: "audio/webm", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", m4a: "audio/mp4" };
+    const mime = mimeMap[ext] || "audio/webm";
+
+    // Build multipart form
+    const boundary = "----NOIR" + Date.now();
+    const filename = "audio." + ext;
+    const parts = [];
+    parts.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"\r\nContent-Type: ${mime}\r\n\r\n`
+    ));
+    parts.push(audioBuf);
+    parts.push(Buffer.from(
+      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-large-v3-turbo`
+    ));
+    parts.push(Buffer.from(
+      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\nde`
+    ));
+    parts.push(Buffer.from(
+      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="response_format"\r\n\r\njson`
+    ));
+    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+    const body = Buffer.concat(parts);
+
+    const resp = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + groqKey,
+        "Content-Type": "multipart/form-data; boundary=" + boundary,
+      },
+      body,
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      console.error("Groq Whisper error:", resp.status, errText);
+      res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Transkription fehlgeschlagen (" + resp.status + ")" }));
+      return;
+    }
+
+    const result = await resp.json();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ text: result.text || "" }));
+  } catch (e) {
+    console.error("Transcribe error:", e.message);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Server-Fehler: " + e.message }));
+  }
+}
+
 /* ---------------- server ---------------- */
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
@@ -538,6 +614,8 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify(results));
     return;
   }
+
+  if (u.pathname === "/api/transcribe" && req.method === "POST") return handleTranscribe(req, res);
 
   if (u.pathname === "/api/health") {
     const cfg = loadConfig();
