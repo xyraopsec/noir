@@ -264,7 +264,7 @@ fileInput.onchange = async () => {
 async function doSend(text, imgs, files) {
   let c = currentConv();
   if (!c) {
-    c = { id: Date.now(), createdAt: new Date().toISOString(), title: text.slice(0, 40) || "Neuer Chat", Nachrichten: [] };
+    c = { id: Date.now(), createdAt: new Date().toISOString(), title: text.slice(0, 40) || "Neuer Chat", messages: [] };
     conversations.push(c); currentId = c.id;
   }
   let content = text;
