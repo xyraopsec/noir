@@ -541,49 +541,58 @@ async function handleTranscribe(req, res) {
     const mimeMap = { webm: "audio/webm", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", m4a: "audio/mp4" };
     const mime = mimeMap[ext] || "audio/webm";
 
-    // Build multipart form
-    const boundary = "----NOIR" + Date.now();
-    const filename = "audio." + ext;
-    const parts = [];
-    parts.push(Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"\r\nContent-Type: ${mime}\r\n\r\n`
-    ));
-    parts.push(audioBuf);
-    parts.push(Buffer.from(
-      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-large-v3-turbo`
-    ));
-    parts.push(Buffer.from(
-      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\nde`
-    ));
-    parts.push(Buffer.from(
-      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="response_format"\r\n\r\njson`
-    ));
-    parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+    // Build multipart/form-data body properly
+    const boundary = "----NOIRBoundary" + Date.now();
+    const encoder = new TextEncoder();
+
+    // Helper to build part
+    function makePart(name, value, filename, contentType) {
+      let header = `--${boundary}\r\nContent-Disposition: form-data; name="${name}"`;
+      if (filename) header += `; filename="${filename}"`;
+      header += "\r\n";
+      if (contentType) header += `Content-Type: ${contentType}\r\n`;
+      header += "\r\n";
+      const headerBuf = encoder.encode(header);
+      const valueBuf = typeof value === "string" ? encoder.encode(value) : value;
+      return Buffer.concat([headerBuf, valueBuf, encoder.encode("\r\n")]);
+    }
+
+    const parts = [
+      makePart("file", audioBuf, "audio." + ext, mime),
+      makePart("model", "whisper-large-v3-turbo"),
+      makePart("language", "de"),
+      makePart("response_format", "json"),
+    ];
+    parts.push(encoder.encode(`--${boundary}--\r\n`));
     const body = Buffer.concat(parts);
+
+    console.log(`[transcribe] Sending ${body.length} bytes to Groq Whisper (${audioBuf.length} byte audio, fmt=${ext})`);
 
     const resp = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
       method: "POST",
       headers: {
         "Authorization": "Bearer " + groqKey,
-        "Content-Type": "multipart/form-data; boundary=" + boundary,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
       },
       body,
       signal: AbortSignal.timeout(30000),
     });
 
+    const respText = await resp.text();
+    console.log(`[transcribe] Groq responded ${resp.status}: ${respText.slice(0, 300)}`);
+
     if (!resp.ok) {
-      const errText = await resp.text().catch(() => "");
-      console.error("Groq Whisper error:", resp.status, errText);
       res.writeHead(502, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Transkription fehlgeschlagen (" + resp.status + ")" }));
+      res.end(JSON.stringify({ error: "Transkription fehlgeschlagen (" + resp.status + ")", detail: respText.slice(0, 200) }));
       return;
     }
 
-    const result = await resp.json();
+    let result;
+    try { result = JSON.parse(respText); } catch { result = { text: respText }; }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ text: result.text || "" }));
   } catch (e) {
-    console.error("Transcribe error:", e.message);
+    console.error("[transcribe] Error:", e.message);
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Server-Fehler: " + e.message }));
   }
