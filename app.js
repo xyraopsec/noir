@@ -15,18 +15,6 @@ const currentConv = () => conversations.find(c => c.id === currentId);
 const saveConvs = () => localStorage.setItem("noir_convs", JSON.stringify(conversations));
 
 /* ---------------- OCR: Bild zu Text ---------------- */
-async function ocrImage(dataUrl) {
-  try {
-    if (typeof Tesseract === "undefined") return "";
-    statusLine.textContent = "Text aus Bild wird erkannt...";
-    const result = await Tesseract.recognize(dataUrl, "deu+eng", { logger: () => {} });
-    const text = (result.data.text || "").trim();
-    return text.length > 15 ? text : "";
-  } catch { return ""; }
-}
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
-
 /* ---------------- markdown ---------------- */
 function enhance(el) {
   el.querySelectorAll("pre code").forEach(code => {
@@ -62,12 +50,18 @@ function threadEl() {
   return t;
 }
 
-function addUserMsg(text, imgs = []) {
+function addUserMsg(text, imgs = [], editable = false) {
   const t = threadEl();
   const m = document.createElement("div"); m.className = "msg user";
   const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
   m.appendChild(b);
   for (const u of imgs) { const i = document.createElement("img"); i.className = "attach-img"; i.src = u; m.appendChild(i); }
+  if (editable) {
+    const row = document.createElement("div"); row.className = "msg-actions";
+    const ed = document.createElement("button"); ed.className = "act-btn"; ed.textContent = "Bearbeiten";
+    ed.onclick = () => editAndResend(text);
+    row.appendChild(ed); m.appendChild(row);
+  }
   t.appendChild(m); chatEl.scrollTop = chatEl.scrollHeight;
 }
 
@@ -107,7 +101,12 @@ function addActions(el, m) {
     if (!("speechSynthesis" in window)) return toast("Audio-Wiedergabe hier nicht verfügbar");
     if (speechSynthesis.speaking) { speechSynthesis.cancel(); listen.textContent = "Anhören"; return; }
     const spoken = new SpeechSynthesisUtterance(m.content.replace(/[`#*_>]/g, " "));
-    spoken.rate = .96; spoken.onend = () => listen.textContent = "Anhören"; listen.textContent = "Stopp"; speechSynthesis.speak(spoken);
+    const voices = speechSynthesis.getVoices();
+    const localVoice = voices.find(v => v.localService === true && v.lang.startsWith("de"))
+      || voices.find(v => v.localService === true) || null;
+    if (localVoice) spoken.voice = localVoice;
+    spoken.lang = "de-DE"; spoken.rate = .96;
+    spoken.onend = () => listen.textContent = "Anhören"; listen.textContent = "Stopp"; speechSynthesis.speak(spoken);
   };
   row.appendChild(listen);
   const c = currentConv();
@@ -141,7 +140,7 @@ function renderChat() {
     chatEl.querySelectorAll(".sugg").forEach(b => b.onclick = () => { inputEl.value = b.dataset.p; inputEl.focus(); autosize(); });
   } else {
     for (const m of c.messages) {
-      if (m.role === "user") addUserMsg(m.content, m.images || []);
+      if (m.role === "user") addUserMsg(m.content, m.images || [], true);
       else {
         const el = addAiMsg();
         if (m.thinking) {
@@ -281,19 +280,8 @@ async function doSend(text, imgs, files) {
   let content = text;
   for (const f of files) content += `\n\n--- FILE: ${f.name} ---\n${f.text}`;
 
-  // OCR: versuche Text aus Bildern zu lesen, bevor Vision benutzt wird
-  let ocrTexts = [];
-  let imgsToSend = imgs;
-  if (imgs.length > 0) {
-    for (const imgData of imgs) {
-      const extracted = await ocrImage(imgData);
-      if (extracted) ocrTexts.push(extracted);
-    }
-    if (ocrTexts.length > 0) {
-      content += "\n\n--- TEXT AUS BILDERN (OCR) ---\n" + ocrTexts.join("\n\n");
-      imgsToSend = [];
-    }
-  }
+  // Bilder werden direkt an Vision-Modell gesendet (kein Tesseract-OCR)
+  const imgsToSend = imgs;
 
   c.messages.push({ role: "user", content, images: imgsToSend });
   renderConvs(convSearch.value); saveConvs();
@@ -355,74 +343,85 @@ async function doSend(text, imgs, files) {
     statusLine.textContent = agentOn ? "Agent arbeitet… " + s + "s" : "Denke nach… " + s + "s";
   }, 500);
 
-  try {
-    const res = await fetch(agentOn ? "/api/agent" : "/api/chat", {
-      method: "POST", signal: aborter.signal,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatModel: "auto", messages: apiMessages, images: imgsToSend, webResults })
-    });
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    bodyEl.innerHTML = `<span class="cursor">▋</span>`;
+  // Streaming with auto-retry on connection drop
+  const MAX_STREAM_RETRY = 2;
+  for (let attempt = 0; attempt <= MAX_STREAM_RETRY; attempt++) {
+    try {
+      const res = await fetch(agentOn ? "/api/agent" : "/api/chat", {
+        method: "POST", signal: aborter.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatModel: "auto", messages: apiMessages, images: imgsToSend, webResults })
+      });
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      if (!acc) bodyEl.innerHTML = `<span class="cursor">▋</span>`;
 
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop();
-      for (const line of lines) {
-        const s = line.trim();
-        if (!s.startsWith("data:")) continue;
-        const data = s.slice(5).trim();
-        if (data === "[DONE]") continue;
-        let j; try { j = JSON.parse(data); } catch { continue; }
-        if (j.notice) { statusLine.textContent = j.notice; continue; }
-        if (j.toolStatus) { addChip(j.toolStatus, true); statusLine.textContent = j.toolStatus; continue; }
-        if (j.toolDone) {
-          const spinning = [...traceEl.querySelectorAll(".tool-chip:not(.ok)")];
-          if (spinning.length) spinning[spinning.length - 1].classList.add("ok");
-          continue;
-        }
-        if (j.fileCreated) {
-          filesMade.push(j.fileCreated);
-          const a = document.createElement("a");
-          a.className = "file-chip";
-          a.href = "/workspace/" + encodeURIComponent(j.fileCreated);
-          a.target = "_blank";
-          a.innerHTML = `▤ ${j.fileCreated} <span class="dl">HERUNTERLADEN</span>`;
-          traceEl.appendChild(a);
-          toast("Datei erstellt: " + j.fileCreated);
-          continue;
-        }
-        if (j.error) {
-          clearInterval(waitTimer);
-          bodyEl.innerHTML = `<div class="err-box">⚠ ${j.error}</div>`;
-          c.messages.push({ role: "assistant", content: "⚠ " + j.error });
-          saveConvs(); finishSend(); return;
-        }
-        const think = j.choices?.[0]?.delta?.reasoning || "";
-        if (think) {
-          if (ttft === null) { ttft = ((performance.now() - t0) / 1000).toFixed(1); clearInterval(waitTimer); }
-          thinkAcc += think;
-          renderThink(true);
-          chatEl.scrollTop = chatEl.scrollHeight;
-        }
-        const piece = j.choices?.[0]?.delta?.content || j.delta || "";
-        if (piece) {
-          if (ttft === null) { ttft = ((performance.now() - t0) / 1000).toFixed(1); clearInterval(waitTimer); }
-          chunks++;
-          acc += piece;
-          renderThink(false);
-          bodyEl.innerHTML = mdRender(acc) + `<span class="cursor">▋</span>`;
-          enhance(bodyEl);
-          chatEl.scrollTop = chatEl.scrollHeight;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop();
+        for (const line of lines) {
+          const s = line.trim();
+          if (!s.startsWith("data:")) continue;
+          const data = s.slice(5).trim();
+          if (data === "[DONE]") continue;
+          let j; try { j = JSON.parse(data); } catch { continue; }
+          if (j.notice) { statusLine.textContent = j.notice; continue; }
+          if (j.toolStatus) { addChip(j.toolStatus, true); statusLine.textContent = j.toolStatus; continue; }
+          if (j.toolDone) {
+            const spinning = [...traceEl.querySelectorAll(".tool-chip:not(.ok)")];
+            if (spinning.length) spinning[spinning.length - 1].classList.add("ok");
+            continue;
+          }
+          if (j.fileCreated) {
+            filesMade.push(j.fileCreated);
+            const a = document.createElement("a");
+            a.className = "file-chip";
+            a.href = "/workspace/" + encodeURIComponent(j.fileCreated);
+            a.target = "_blank";
+            a.innerHTML = `▤ ${j.fileCreated} <span class="dl">HERUNTERLADEN</span>`;
+            traceEl.appendChild(a);
+            toast("Datei erstellt: " + j.fileCreated);
+            continue;
+          }
+          if (j.error) {
+            clearInterval(waitTimer);
+            bodyEl.innerHTML = `<div class="err-box">⚠ ${j.error}</div>`;
+            c.messages.push({ role: "assistant", content: "⚠ " + j.error });
+            saveConvs(); finishSend(); return;
+          }
+          const think = j.choices?.[0]?.delta?.reasoning || "";
+          if (think) {
+            if (ttft === null) { ttft = ((performance.now() - t0) / 1000).toFixed(1); clearInterval(waitTimer); }
+            thinkAcc += think;
+            renderThink(true);
+            chatEl.scrollTop = chatEl.scrollHeight;
+          }
+          const piece = j.choices?.[0]?.delta?.content || j.delta || "";
+          if (piece) {
+            if (ttft === null) { ttft = ((performance.now() - t0) / 1000).toFixed(1); clearInterval(waitTimer); }
+            chunks++;
+            acc += piece;
+            renderThink(false);
+            bodyEl.innerHTML = mdRender(acc) + `<span class="cursor">▋</span>`;
+            enhance(bodyEl);
+            chatEl.scrollTop = chatEl.scrollHeight;
+          }
         }
       }
+      break; // success — exit retry loop
+    } catch (e) {
+      if (e.name === "AbortError") break;
+      if (attempt < MAX_STREAM_RETRY && !acc) {
+        statusLine.textContent = "Verbindung verloren — versuche erneut… (" + (attempt + 1) + "/" + MAX_STREAM_RETRY + ")";
+        await new Promise(r => setTimeout(r, 1500));
+        continue;
+      }
+      acc += (acc ? "\n\n" : "") + "⚠ Verbindung verloren: " + e.message;
     }
-  } catch (e) {
-    if (e.name !== "AbortError") acc += (acc ? "\n\n" : "") + "⚠ Verbindung verloren: " + e.message;
   }
   clearInterval(waitTimer);
 
@@ -483,6 +482,22 @@ function regenerate() {
   while (c.messages.length && c.messages[c.messages.length - 1].role === "assistant") c.messages.pop();
   saveConvs(); renderChat();
   doSend("", [], []);
+}
+
+function editAndResend(originalText) {
+  const c = currentConv();
+  if (!c || busy) return;
+  // Find the user message index and truncate from there
+  const idx = c.messages.findIndex(m => m.role === "user" && m.content === originalText);
+  if (idx === -1) return;
+  c.messages = c.messages.slice(0, idx);
+  saveConvs();
+  inputEl.value = originalText;
+  localStorage.setItem("noir_draft", originalText);
+  autosize();
+  inputEl.focus();
+  renderChat();
+  toast("Nachricht bearbeiten — Enter zum Neusenden");
 }
 
 /* ---------------- voice chat ---------------- */
@@ -641,6 +656,12 @@ function speakText(text) {
   speechSynthesis.cancel();
   const clean = text.replace(/[`#*_>\[\]]/g, " ").replace(/\s+/g, " ").trim();
   const spoken = new SpeechSynthesisUtterance(clean.slice(0, 3000));
+  // Nur lokale Stimmen verwenden — kein Cloud-TTS
+  const voices = speechSynthesis.getVoices();
+  const localVoice = voices.find(v => v.localService === true && v.lang.startsWith("de"))
+    || voices.find(v => v.localService === true)
+    || null;
+  if (localVoice) spoken.voice = localVoice;
   spoken.lang = "de-DE";
   spoken.rate = 0.95;
   speechSynthesis.speak(spoken);
