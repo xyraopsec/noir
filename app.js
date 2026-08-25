@@ -200,7 +200,7 @@ function renderConvs(filter = "") {
     d.append(t, pin, x);
     d.onclick = () => { currentId = c.id;
       saveConvs(); renderConvs(convSearch.value); renderChat();
-      if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed"); };
+      if (window.innerWidth <= 700) closeSidebar(); };
     convList.appendChild(d);
   }
 }
@@ -544,7 +544,7 @@ sendBtn.onclick = () => { if (busy) aborter?.abort(); else send(); };
 inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
 inputEl.addEventListener("input", () => { localStorage.setItem("noir_draft", inputEl.value); autosize(); });
 $("#newChatBtn").onclick = () => { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus();
-  if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed"); };
+  if (window.innerWidth <= 700) closeSidebar(); };
 $("#attachBtn").onclick = () => fileInput.click();
 webBtn.onclick = () => { webOn = !webOn; webBtn.classList.toggle("on", webOn); agentOn = false; agentBtn.classList.remove("on");
   statusLine.textContent = webOn ? "Web-Recherche aktiviert" : ""; };
@@ -570,8 +570,23 @@ $("#exportBtn").onclick = () => {
   a.click();
   toast("Als Markdown exportiert ✓");
 };
-$("#menuBtn").onclick = () => $("#sidebar").classList.add("collapsed");
-$("#menuBtn2").onclick = () => $("#sidebar").classList.toggle("collapsed");
+function toggleSidebar() {
+  const sb = $("#sidebar");
+  const bd = $("#sidebarBackdrop");
+  sb.classList.toggle("collapsed");
+  if (window.innerWidth <= 700) {
+    const open = !sb.classList.contains("collapsed");
+    if (bd) bd.classList.toggle("hidden", !open);
+  }
+}
+function closeSidebar() {
+  const sb = $("#sidebar");
+  const bd = $("#sidebarBackdrop");
+  sb.classList.add("collapsed");
+  if (bd) bd.classList.add("hidden");
+}
+$("#menuBtn").onclick = closeSidebar;
+$("#menuBtn2").onclick = toggleSidebar;
 const convSearch = $("#convSearch");
 convSearch.addEventListener("input", () => renderConvs(convSearch.value));
 
@@ -687,7 +702,7 @@ function initNoir() {
   inputEl.value = localStorage.getItem("noir_draft") || ""; autosize();
   loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));
   renderConvs();
-  if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed");
+  if (window.innerWidth <= 700) closeSidebar();
 }
 if (window.noirAccessGranted) initNoir();
 else window.addEventListener("noir:accessGranted", initNoir, { once: true });
