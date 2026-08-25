@@ -262,6 +262,8 @@ async function handleChat(req, res) {
     m = cfg.models[picked] || m;
     autoNote = "Auto -> " + (m.label || picked);
   }
+  const modelLabel = m.label || m.id || "unknown";
+  const modelProvider = m.provider || "unknown";
   let messages = Array.isArray(body.messages) ? body.messages.map(x => ({ role: x.role, content: x.content })) : [];
 
   if (Array.isArray(body.images) && body.images.length && messages.length) {
@@ -315,7 +317,7 @@ async function handleChat(req, res) {
 
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
   if (autoNote) {
-    res.write(`data: ${JSON.stringify({ notice: autoNote })}\n\n`);
+    res.write(`data: ${JSON.stringify({ notice: autoNote, modelInfo: { label: modelLabel, provider: modelProvider } })}\n\n`);
   }
   if (usedId !== m.id) {
     res.write(`data: ${JSON.stringify({ notice: "Wechsel zu " + usedId })}\n\n`);
@@ -452,6 +454,7 @@ async function handleAgent(req, res) {
   const history = (body.messages || []).slice(-8);
   const messages = [{ role: "system", content: AGENT_SYSTEM }, ...history];
   let toolsUsed = 0;
+  send({ notice: "Agent → " + (m.label || picked), modelInfo: { label: m.label || picked, provider: m.provider || "unknown" } });
 
   try {
     for (let step = 0; step < 8; step++) {

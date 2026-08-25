@@ -339,6 +339,12 @@ button { font-family: inherit; }
   #sendBtn { width: 38px; height: 38px; }
 }
 
+/* ================= model badge ================= */
+.model-badge { display:inline-flex; align-items:center; gap:5px; font:10px var(--mono);
+  color:var(--faint); letter-spacing:.04em; padding:3px 8px; margin-top:6px;
+  border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,.02); }
+.model-dot { width:5px; height:5px; border-radius:50%; background:#d59658; flex-shrink:0; }
+
 /* ================= voice status + mic pulse ================= */
 .voice-status { text-align:center; padding:8px 12px; margin-bottom:6px; border-radius:10px;
   font:12px var(--mono); letter-spacing:.03em; animation:fadeSlide .2s ease; }

@@ -172,6 +172,11 @@ function renderChat() {
           }
           el.parentElement.insertBefore(fr, el);
         }
+        if (m.model) {
+          const mb = document.createElement("div"); mb.className = "model-badge";
+          mb.innerHTML = `<span class="model-dot"></span>${m.model.label}${m.model.provider ? " · " + m.model.provider : ""}`;
+          el.appendChild(mb);
+        }
         if (m.stats) el.appendChild(statsRow(m.stats));
         if (m.sources?.length) el.appendChild(sourcesBlock(m.sources));
         addActions(el, m);
@@ -299,7 +304,7 @@ async function doSend(text, imgs, files) {
   const thinkWrap = aiEl.querySelector(".think-wrap");
   const bodyEl = aiEl.querySelector(".body");
   aiEl.parentElement.classList.add("streaming");
-  let acc = "", thinkAcc = "", filesMade = [];
+  let acc = "", thinkAcc = "", filesMade = [], modelInfo = null;
   busy = true; sendBtn.classList.add("stop"); sendBtn.innerHTML = "■";
   aborter = new AbortController();
 
@@ -370,7 +375,7 @@ async function doSend(text, imgs, files) {
           const data = s.slice(5).trim();
           if (data === "[DONE]") continue;
           let j; try { j = JSON.parse(data); } catch { continue; }
-          if (j.notice) { statusLine.textContent = j.notice; continue; }
+          if (j.notice) { statusLine.textContent = j.notice; if (j.modelInfo) modelInfo = j.modelInfo; continue; }
           if (j.toolStatus) { addChip(j.toolStatus, true); statusLine.textContent = j.toolStatus; continue; }
           if (j.toolDone) {
             const spinning = [...traceEl.querySelectorAll(".tool-chip:not(.ok)")];
@@ -437,7 +442,7 @@ async function doSend(text, imgs, files) {
   aiEl.parentElement.classList.remove("streaming");
   aiEl.appendChild(statsRow(stats));
   if (webResults?.length) aiEl.appendChild(sourcesBlock(webResults));
-  const aiMsg = { role: "assistant", content: acc, thinking: thinkAcc, stats, sources: webResults, files: filesMade, tools: traceEl ? [...traceEl.querySelectorAll(".tool-chip")].map(ch => ch.textContent) : [] };
+  const aiMsg = { role: "assistant", content: acc, thinking: thinkAcc, stats, sources: webResults, files: filesMade, tools: traceEl ? [...traceEl.querySelectorAll(".tool-chip")].map(ch => ch.textContent) : [], model: modelInfo };
   c.messages.push(aiMsg);
   saveConvs(); renderConvs(convSearch.value);
   addActions(aiEl, aiMsg);
