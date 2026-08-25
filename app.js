@@ -14,7 +14,8 @@ let pendingImgs = [], pendingFiles = [], webOn = false, agentOn = false;
 const currentConv = () => conversations.find(c => c.id === currentId);
 const saveConvs = () => localStorage.setItem("noir_convs", JSON.stringify(conversations));
 
-/* ---------------- OCR: Bild zu Text ---------------- */
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
 /* ---------------- markdown ---------------- */
 function enhance(el) {
   el.querySelectorAll("pre code").forEach(code => {
