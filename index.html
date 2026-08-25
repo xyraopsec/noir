@@ -75,11 +75,6 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
       Neuer Chat
     </button>
-    <div class="tier-selector">
-      <button class="tier-btn" data-tier="fast">⚡ Schnell</button>
-      <button class="tier-btn active" data-tier="balanced">◉ Balanciert</button>
-      <button class="tier-btn" data-tier="smart">◈ Schlau</button>
-    </div>
     <div class="side-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="convSearch" placeholder="Chats durchsuchen"><kbd>⌘ K</kbd></div>
     <div class="library-label"><span>DEINE THREADS</span><span id="threadCount"></span></div>
     <div id="convList"></div>
@@ -92,7 +87,7 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Einstellungen
       </button>
-      <div class="profile-card"><div class="profile-orb">N</div><div><strong>Privater Arbeitsbereich</strong><span>Alles bleibt bei dir</span></div><span class="profile-more">•••</span></div>
+      <div class="profile-card"><div class="profile-orb"><img id="profileAvatar" src="assets/avatar.jpg" alt=""></div><div><strong id="profileName">Privater Arbeitsbereich</strong><span>Alles bleibt bei dir</span></div><span class="profile-more">•••</span></div>
     </div>
   </aside>
 
@@ -121,6 +116,16 @@
 <footer id="composerWrap">
   <div id="voiceStatus" class="voice-status" style="display:none"></div>
   <div id="attachRow" class="hidden"></div>
+  <div id="modelBar">
+    <div id="modelPickerWrap">
+      <button id="tierPick" class="model-pick" title="Modus wählen"><span id="tierIcon">◉</span><span id="tierLabel">Balanciert</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m7 10 5 5 5-5"/></svg></button>
+      <div id="modelMenu" class="hidden">
+        <button class="menu-item" data-tier="fast"><span class="l">⚡ Schnell <span class="check"></span></span><span class="s">~500 Tok/s — Groq</span></button>
+        <button class="menu-item" data-tier="balanced"><span class="l">◉ Balanciert <span class="check"></span></span><span class="s">Speed + Klugheit</span></button>
+        <button class="menu-item" data-tier="smart"><span class="l">◈ Schlau <span class="check"></span></span><span class="s">Beste Qualität — Gemini</span></button>
+      </div>
+    </div>
+  </div>
   <div id="composer">
     <button id="attachBtn" class="icon-ghost" title="PDF / Bild anhängen">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>

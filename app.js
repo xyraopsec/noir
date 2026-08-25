@@ -624,19 +624,52 @@ voiceBtn.onclick = () => {
 
 let autoRead = localStorage.getItem("noir_autoread") === "true";
 
-/* ---------------- model tier selector ---------------- */
-const tierMap = { fast: "Schnell", balanced: "Balanciert", smart: "Schlau" };
-document.querySelectorAll(".tier-btn").forEach(btn => {
-  if (btn.dataset.tier === modelTier) btn.classList.add("active");
-  else btn.classList.remove("active");
-  btn.onclick = () => {
-    document.querySelectorAll(".tier-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    modelTier = btn.dataset.tier;
+/* ---------------- model tier dropdown (composer) ---------------- */
+const TIERS = { fast: { icon: "⚡", label: "Schnell" }, balanced: { icon: "◉", label: "Balanciert" }, smart: { icon: "◈", label: "Schlau" } };
+const tierMenu = $("#modelMenu"), tierLabel = $("#tierLabel"), tierIcon = $("#tierIcon"), pickerWrap = $("#modelPickerWrap");
+function syncTierUI() {
+  if (!tierLabel) return;
+  tierLabel.textContent = TIERS[modelTier].label;
+  tierIcon.textContent = TIERS[modelTier].icon;
+  tierMenu.querySelectorAll(".menu-item").forEach(b => {
+    b.querySelector(".check").textContent = b.dataset.tier === modelTier ? "✓" : "";
+  });
+}
+if (pickerWrap) {
+  $("#tierPick").onclick = (e) => { e.stopPropagation(); tierMenu.classList.toggle("hidden"); };
+  document.addEventListener("click", (e) => {
+    if (!tierMenu.classList.contains("hidden") && !pickerWrap.contains(e.target)) tierMenu.classList.add("hidden");
+  });
+  tierMenu.querySelectorAll(".menu-item").forEach(b => b.onclick = () => {
+    modelTier = b.dataset.tier;
     localStorage.setItem("noir_tier", modelTier);
-    toast(modelTier === "fast" ? "⚡ Schnell — ~500 tok/s" : modelTier === "balanced" ? "◉ Balanciert — schnell + klug" : "◈ Schlau — beste Qualität");
-  };
-});
+    syncTierUI();
+    tierMenu.classList.add("hidden");
+    toast(TIERS[modelTier].icon + " Modus: " + TIERS[modelTier].label);
+  });
+  syncTierUI();
+}
+
+/* ---------------- profile card (logged-in user) ---------------- */
+const NOIR_USERS = {
+  "andi.selmani@stud.sek-ds.ch":       ["Andi",   "Owner",  "assets/andi.png"],
+  "david.salgado@stud.sek-ds.ch":      ["David S.","Friend","assets/david.png"],
+  "david.rosario@stud.sek-ds.ch":      ["David R.","Friend","assets/david.png"],
+  "lisian.ademi@stud.sek-ds.ch":       ["Lisian", "Friend", "assets/lisian.png"],
+  "matteo.retortillo@stud.sek-ds.ch":  ["Matteo", "Friend", "assets/matteo.png"],
+};
+function applyProfile() {
+  try {
+    const t = localStorage.getItem("noir_code") || "";
+    if (!t.startsWith("noir1.")) return;
+    const j = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const u = NOIR_USERS[(j.e || "").toLowerCase()];
+    if (!u) return;
+    const av = $("#profileAvatar"), nm = $("#profileName"), role = u[1] === "Owner" ? "Besitzer" : "Mitglied";
+    if (av) av.src = u[2];
+    if (nm) nm.textContent = u[0] + " · " + role;
+  } catch {}
+}
 
 function speakText(text) {
   if (!("speechSynthesis" in window)) return;
@@ -831,6 +864,7 @@ function initNoir() {
   if (localStorage.getItem("noir_agent_default") === "true") { agentOn = true; agentBtn.classList.add("on"); webOn = false; webBtn.classList.remove("on"); statusLine.textContent = "Agentenmodus aktiviert"; }
   loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));
   renderConvs();
+  applyProfile();
   if (window.innerWidth <= 1180) closeSidebar();
 }
 if (window.noirAccessGranted) initNoir();
