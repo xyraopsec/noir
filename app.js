@@ -486,38 +486,147 @@ function regenerate() {
 }
 
 /* ---------------- voice chat ---------------- */
-let voiceOn = false, recognition = null;
+let voiceOn = false, recognition = null, voiceRetryCount = 0;
 const voiceBtn = $("#voiceBtn"), readBtn = $("#readBtn");
+const VOICE_MAX_RETRY = 3;
 
-if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.interimResults = true;
-  recognition.lang = "de-DE";
+function voiceSupported() {
+  return "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+}
 
-  recognition.onresult = (e) => {
-    let transcript = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-    inputEl.value = transcript;
-    autosize();
-  };
-  recognition.onend = () => {
+function setVoiceStatus(text, type) {
+  const sl = $("#voiceStatus");
+  if (!sl) return;
+  sl.textContent = text;
+  sl.className = "voice-status" + (type ? " " + type : "");
+  sl.style.display = text ? "" : "none";
+}
+
+function startVoice() {
+  if (!voiceSupported()) {
+    toast("Spracherkennung wird von diesem Browser nicht unterstuetzt. Bitte tippe deine Nachricht.");
+    return;
+  }
+
+  // Request mic permission explicitly first
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
+    beginRecognition();
+  }).catch(err => {
+    console.warn("Mic permission error:", err);
+    if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+      toast("Mikrofon-Zugriff verweigert. Erlaube den Zugriff in den Browsereinstellungen.");
+      setVoiceStatus("Mikrofon blockiert — bitte Berechtigung erteilen", "error");
+    } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+      toast("Kein Mikrofon gefunden. Verbinde ein Mikrofon und versuche es erneut.");
+      setVoiceStatus("Kein Mikrofon erkannt", "error");
+    } else {
+      toast("Mikrofon-Fehler: " + err.message);
+      setVoiceStatus("Mikrofon-Fehler", "error");
+    }
     voiceOn = false;
     voiceBtn.classList.remove("on");
-    const txt = inputEl.value.trim();
-    if (txt) send();
+  });
+}
+
+function beginRecognition() {
+  if (recognition) { try { recognition.abort(); } catch(e) {} }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "de-DE";
+  recognition.maxAlternatives = 1;
+
+  voiceOn = true;
+  voiceBtn.classList.add("on");
+  voiceBtn.classList.add("listening");
+  setVoiceStatus("Höre zu... sprich jetzt", "listening");
+  voiceRetryCount = 0;
+
+  recognition.onresult = (e) => {
+    let interim = "", final = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    if (final) {
+      inputEl.value = (inputEl.value ? inputEl.value + " " : "") + final;
+      autosize();
+    }
+    if (interim) {
+      setVoiceStatus("💬 " + interim, "interim");
+    }
   };
-  recognition.onerror = () => { voiceOn = false; voiceBtn.classList.remove("on"); };
+
+  recognition.onend = () => {
+    // Auto-restart if still in voice mode and no text entered
+    if (voiceOn && !inputEl.value.trim()) {
+      voiceRetryCount++;
+      if (voiceRetryCount < VOICE_MAX_RETRY) {
+        setVoiceStatus("Neustart...", "listening");
+        try { recognition.start(); } catch(e) { stopVoice("Fehler beim Neustart"); }
+        return;
+      }
+    }
+    stopVoice();
+    const txt = inputEl.value.trim();
+    if (txt) {
+      setVoiceStatus("✓ Erkannt — Enter zum Senden", "success");
+    } else {
+      setVoiceStatus("", "");
+    }
+  };
+
+  recognition.onerror = (e) => {
+    console.warn("Speech recognition error:", e.error);
+    if (e.error === "no-speech") {
+      // No speech detected — try again silently
+      if (voiceOn && voiceRetryCount < VOICE_MAX_RETRY) {
+        voiceRetryCount++;
+        try { recognition.start(); } catch(ex) { stopVoice("Keine Sprache erkannt"); }
+        return;
+      }
+      stopVoice("Keine Sprache erkannt — versuche es nochmal");
+    } else if (e.error === "audio-capture") {
+      stopVoice("Mikrofon nicht verfügbar");
+      toast("Mikrofon wird gerade von einer anderen App verwendet");
+    } else if (e.error === "not-allowed") {
+      stopVoice("Mikrofon-Zugriff verweigert");
+      toast("Erlaube Mikrofon-Zugriff in den Browsereinstellungen");
+    } else if (e.error === "network") {
+      stopVoice("Netzwerkfehler — Spracherkennung benötigt Internet");
+      toast("Internetverbindung prüfen");
+    } else if (e.error === "aborted") {
+      // User manually stopped — no error
+    } else {
+      stopVoice("Spracherkennung-Fehler: " + e.error);
+    }
+  };
+
+  try {
+    recognition.start();
+  } catch(e) {
+    stopVoice("Konnte Spracherkennung nicht starten");
+  }
+}
+
+function stopVoice(msg) {
+  voiceOn = false;
+  voiceBtn.classList.remove("on");
+  voiceBtn.classList.remove("listening");
+  try { recognition?.stop(); } catch(e) {}
+  if (msg) setVoiceStatus(msg, "error");
 }
 
 voiceBtn.onclick = () => {
-  if (!recognition) return toast("Spracherkennung wird von diesem Browser nicht unterstuetzt");
-  if (voiceOn) { recognition.stop(); voiceOn = false; voiceBtn.classList.remove("on"); return; }
-  voiceOn = true;
-  voiceBtn.classList.add("on");
-  statusLine.textContent = "Hoere zu...";
-  recognition.start();
+  if (voiceOn) {
+    stopVoice();
+    setVoiceStatus(inputEl.value.trim() ? "✓ Unterbrochen — Text beibehalten" : "", "");
+    return;
+  }
+  startVoice();
 };
 
 let autoRead = false;
