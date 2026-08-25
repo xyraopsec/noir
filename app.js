@@ -651,6 +651,9 @@ if (pickerWrap) {
 }
 
 /* ---------------- profile card (logged-in user) ---------------- */
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+if (isStandalone) document.body.classList.add("noir-standalone");
+
 const NOIR_USERS = {
   "andi.selmani@stud.sek-ds.ch":       ["Andi",   "Owner",  "assets/andi.png"],
   "david.salgado@stud.sek-ds.ch":      ["David S.","Friend","assets/david.png"],
