@@ -10,6 +10,7 @@ let conversations = JSON.parse(localStorage.getItem("noir_convs") || "[]");
 let currentId = null;
 let busy = false, aborter = null, lastModalTrigger = null;
 let pendingImgs = [], pendingFiles = [], webOn = false, agentOn = false;
+let modelTier = localStorage.getItem("noir_tier") || "balanced";
 
 const currentConv = () => conversations.find(c => c.id === currentId);
 const saveConvs = () => localStorage.setItem("noir_convs", JSON.stringify(conversations));
@@ -17,6 +18,12 @@ const saveConvs = () => localStorage.setItem("noir_convs", JSON.stringify(conver
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
 /* ---------------- markdown ---------------- */
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+  pedantic: false,
+  smartypants: false
+});
 function enhance(el) {
   el.querySelectorAll("pre code").forEach(code => {
     try { hljs.highlightElement(code); } catch {}
@@ -33,7 +40,7 @@ function enhance(el) {
     pre.replaceWith(block); block.appendChild(head); block.appendChild(pre);
   });
 }
-const mdRender = (t) => DOMPurify.sanitize(marked.parse(t || "", { breaks: true }));
+const mdRender = (t) => DOMPurify.sanitize(marked.parse(t || "", { breaks: true, gfm: true }));
 
 /* ---------------- layout ---------------- */
 function isHero() { const c = currentConv(); return !c || !c.messages.length; }
@@ -174,7 +181,8 @@ function renderChat() {
         }
         if (m.model) {
           const mb = document.createElement("div"); mb.className = "model-badge";
-          mb.innerHTML = `<span class="model-dot"></span>${m.model.label}${m.model.provider ? " · " + m.model.provider : ""}`;
+          const tierIcon = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : "◉";
+          mb.innerHTML = `<span class="model-dot"></span>${tierIcon} ${m.model.label}${m.model.provider ? " · " + m.model.provider : ""}`;
           el.appendChild(mb);
         }
         if (m.stats) el.appendChild(statsRow(m.stats));
@@ -310,10 +318,10 @@ async function doSend(text, imgs, files) {
 
   let webResults = null;
   if (webOn && !agentOn) {
-    statusLine.textContent = "Durchsuche das Web…";
+    statusLine.textContent = "🔍 Durchsuche das Web…";
     try {
       webResults = await (await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 300)))).json();
-      statusLine.textContent = webResults.length ? `${webResults.length} Quellen gefunden` : "Keine Quellen gefunden";
+      statusLine.textContent = webResults.length ? `✓ ${webResults.length} Quellen gefunden` : "Keine Quellen gefunden";
     } catch { statusLine.textContent = "Suche fehlgeschlagen"; }
   } else statusLine.textContent = "";
 
@@ -345,8 +353,9 @@ async function doSend(text, imgs, files) {
   // live progress clock while waiting for the first token
   const waitTimer = setInterval(() => {
     if (ttft !== null) { clearInterval(waitTimer); return; }
-    const s = ((performance.now() - t0) / 1000).toFixed(0);
-    statusLine.textContent = agentOn ? "Agent arbeitet… " + s + "s" : "Denke nach… " + s + "s";
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(0);
+    const tierLabel = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : "◉";
+    statusLine.textContent = agentOn ? `${tierLabel} Agent arbeitet… ${elapsed}s` : `${tierLabel} Denke nach… ${elapsed}s`;
   }, 500);
 
   // Streaming with auto-retry on connection drop
@@ -356,7 +365,7 @@ async function doSend(text, imgs, files) {
       const res = await fetch(agentOn ? "/api/agent" : "/api/chat", {
         method: "POST", signal: aborter.signal,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatModel: "auto", messages: apiMessages, images: imgsToSend, webResults })
+        body: JSON.stringify({ chatModel: "auto", tier: modelTier, messages: apiMessages, images: imgsToSend, webResults })
       });
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -376,7 +385,7 @@ async function doSend(text, imgs, files) {
           if (data === "[DONE]") continue;
           let j; try { j = JSON.parse(data); } catch { continue; }
           if (j.notice) { statusLine.textContent = j.notice; if (j.modelInfo) modelInfo = j.modelInfo; continue; }
-          if (j.toolStatus) { addChip(j.toolStatus, true); statusLine.textContent = j.toolStatus; continue; }
+          if (j.toolStatus) { addChip(j.toolStatus, true); statusLine.textContent = "🔧 " + j.toolStatus; continue; }
           if (j.toolDone) {
             const spinning = [...traceEl.querySelectorAll(".tool-chip:not(.ok)")];
             if (spinning.length) spinning[spinning.length - 1].classList.add("ok");
@@ -508,7 +517,7 @@ function editAndResend(originalText) {
 
 /* ---------------- voice chat (MediaRecorder + Groq Whisper) ---------------- */
 let mediaRecorder = null, audioChunks = [], recordingStart = 0, recTimer = null;
-const voiceBtn = $("#voiceBtn"), readBtn = $("#readBtn");
+const voiceBtn = $("#voiceBtn");
 
 function setVoiceStatus(text, type) {
   const sl = $("#voiceStatus");
@@ -613,12 +622,21 @@ voiceBtn.onclick = () => {
   }
 };
 
-let autoRead = false;
-readBtn.onclick = () => {
-  autoRead = !autoRead;
-  readBtn.classList.toggle("on", autoRead);
-  toast(autoRead ? "Antwort wird automatisch vorgelesen" : "Auto-Vorlesen deaktiviert");
-};
+let autoRead = localStorage.getItem("noir_autoread") === "true";
+
+/* ---------------- model tier selector ---------------- */
+const tierMap = { fast: "Schnell", balanced: "Balanciert", smart: "Schlau" };
+document.querySelectorAll(".tier-btn").forEach(btn => {
+  if (btn.dataset.tier === modelTier) btn.classList.add("active");
+  else btn.classList.remove("active");
+  btn.onclick = () => {
+    document.querySelectorAll(".tier-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    modelTier = btn.dataset.tier;
+    localStorage.setItem("noir_tier", modelTier);
+    toast(modelTier === "fast" ? "⚡ Schnell — ~500 tok/s" : modelTier === "balanced" ? "◉ Balanciert — schnell + klug" : "◈ Schlau — beste Qualität");
+  };
+});
 
 function speakText(text) {
   if (!("speechSynthesis" in window)) return;
@@ -783,7 +801,6 @@ $("#saveSettings").onclick = async () => {
   localStorage.setItem("noir_web_default", $("#settWebOn").checked ? "true" : "false");
   localStorage.setItem("noir_agent_default", $("#settAgentOn").checked ? "true" : "false");
   autoRead = $("#settAutoRead").checked;
-  readBtn.classList.toggle("on", autoRead);
   if ($("#settWebOn").checked && !webOn) { webOn = true; webBtn.classList.add("on"); }
   if ($("#settAgentOn").checked && !agentOn) { agentOn = true; agentBtn.classList.add("on"); webOn = false; webBtn.classList.remove("on"); }
   closeSettings(); loadModels();
@@ -810,7 +827,6 @@ function initNoir() {
   setTimeout(() => { const s = document.getElementById("splash"); if (s) s.style.display = "none"; }, 8000);
   inputEl.value = localStorage.getItem("noir_draft") || ""; autosize();
   autoRead = localStorage.getItem("noir_autoread") === "true";
-  readBtn.classList.toggle("on", autoRead);
   if (localStorage.getItem("noir_web_default") === "true") { webOn = true; webBtn.classList.add("on"); statusLine.textContent = "Web-Recherche aktiviert"; }
   if (localStorage.getItem("noir_agent_default") === "true") { agentOn = true; agentBtn.classList.add("on"); webOn = false; webBtn.classList.remove("on"); statusLine.textContent = "Agentenmodus aktiviert"; }
   loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));

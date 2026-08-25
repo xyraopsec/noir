@@ -106,9 +106,11 @@ button { font-family: inherit; }
 .msg.ai li { margin-bottom: 5px; }
 .msg.ai a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--faint); }
 .msg.ai blockquote { border-left: 2px solid var(--border2); padding-left: 14px; color: var(--dim); margin: 9px 0; }
-.msg.ai table { border-collapse: collapse; margin: 13px 0; width: 100%; font-size: 13px; }
-.msg.ai th { background: var(--surface); font-weight: 600; }
+.msg.ai table { border-collapse: collapse; margin: 13px 0; width: 100%; font-size: 13px; display: table; }
+.msg.ai th { background: var(--surface); font-weight: 600; text-align: left; }
 .msg.ai th, .msg.ai td { border: 1px solid var(--border2); padding: 8px 13px; text-align: left; }
+.msg.ai tr:nth-child(even) { background: rgba(255,255,255,.02); }
+.msg.ai tr:hover { background: rgba(255,255,255,.04); }
 .msg.ai hr { border: none; border-top: 1px solid var(--border); margin: 15px 0; }
 
 .msg.ai :not(pre) > code { background: var(--surface); padding: 2px 6px; border-radius: 6px;
@@ -186,7 +188,6 @@ button { font-family: inherit; }
 .icon-ghost:hover { color: var(--text); background: var(--surface2); }
 .icon-ghost.on { color: #000; background: var(--white); }
 #voiceBtn.listening { color: #d59658; }
-#readBtn.on { color: #d59658; background: rgba(213,150,88,.12); }
 #sendBtn { width: 34px; height: 34px; border-radius: 11px; border: none; background: var(--white);
   color: #000; cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: .15s; flex-shrink: 0; }
@@ -257,7 +258,7 @@ button { font-family: inherit; }
   /* Bigger touch targets */
   .icon-ghost { width: 40px; height: 40px; border-radius: 12px; }
   #sendBtn { width: 42px; height: 42px; border-radius: 13px; }
-  #voiceBtn, #readBtn { width: 40px; height: 40px; }
+  #voiceBtn { width: 40px; height: 40px; }
 
   /* Composer fix at bottom */
   #composerWrap { position: sticky; bottom: 0; z-index: 20; background: var(--bg);
@@ -340,9 +341,13 @@ button { font-family: inherit; }
 
 /* ================= model badge ================= */
 .model-badge { display:inline-flex; align-items:center; gap:5px; font:10px var(--mono);
-  color:var(--faint); letter-spacing:.04em; padding:3px 8px; margin-top:6px;
-  border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,.02); }
-.model-dot { width:5px; height:5px; border-radius:50%; background:#d59658; flex-shrink:0; }
+  color:var(--faint); letter-spacing:.04em; padding:4px 10px; margin-top:8px;
+  border:1px solid var(--border); border-radius:999px; background:rgba(255,255,255,.03);
+  transition: opacity .2s; }
+.model-badge:hover { opacity:.7; }
+.model-dot { width:5px; height:5px; border-radius:50%; background:#d59658; flex-shrink:0;
+  animation: dotGlow 2s ease-in-out infinite; }
+@keyframes dotGlow { 0%,100% { box-shadow:0 0 0 0 rgba(213,150,88,.3); } 50% { box-shadow:0 0 4px 2px rgba(213,150,88,.15); } }
 
 /* ================= voice status + mic pulse ================= */
 .voice-status { text-align:center; padding:8px 12px; margin-bottom:6px; border-radius:10px;
@@ -409,9 +414,15 @@ button { font-family: inherit; }
 #splashSkip:hover { color: #999; }
 
 /* ================= v4: personality ================= */
-/* photo avatar for NOIR */
-.msg.ai .glyph { background-size: cover; background-position: center; color: transparent; }
-.msg.ai .glyph { background-image: url("assets/avatar.jpg"); filter: grayscale(1) contrast(1.1); }
+/* photo avatar for NOIR — B&W version */
+.msg.ai .glyph {
+  background-size: cover;
+  background-position: center;
+  color: transparent;
+  background-image: url("assets/avatar.jpg");
+  filter: grayscale(1) contrast(1.3) brightness(1.1);
+  border: 1px solid rgba(255,255,255,.08);
+}
 
 /* topbar */
 #topbar { gap: 12px; }
@@ -674,7 +685,7 @@ body { background:#090909; }
   /* Touch targets: 44px minimum (Apple HIG) */
   .icon-ghost { width: 44px; height: 44px; }
   #sendBtn { width: 44px; height: 44px; }
-  #voiceBtn, #readBtn { width: 44px; height: 44px; }
+  #voiceBtn { width: 44px; height: 44px; }
   .bare-btn { min-width: 44px; min-height: 44px; }
 
   /* Suggestion cards: 2-column grid */
@@ -742,24 +753,12 @@ body { background:#090909; }
 @keyframes chatFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Better logo */
-.logo {
-  font-weight: 300;
-  letter-spacing: .4em;
-  font-size: 15px;
-  color: #fff;
-  text-transform: uppercase;
-}
-.brand-lockup {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.brand-lockup span {
-  color: #555;
-  font: 9px var(--mono);
-  letter-spacing: .12em;
-  opacity: 0.7;
-}
+.brand-lockup { display:flex; align-items:center; gap:10px; }
+.logo-mark { flex-shrink:0; }
+.logo-mark svg { width:28px; height:28px; display:block; }
+.brand-text { display:flex; flex-direction:column; gap:2px; }
+.logo { font-weight:300; letter-spacing:.4em; font-size:14px; color:#fff; text-transform:uppercase; line-height:1; }
+.brand-lockup span { color:#555; font:8px var(--mono); letter-spacing:.12em; opacity:.6; }
 
 /* Smooth sidebar toggle */
 #sidebar { transition: transform .28s cubic-bezier(.4,0,.2,1); }
@@ -770,6 +769,13 @@ body { background:#090909; }
 
 /* Settings toggles */
 .settings-divider { height: 1px; background: #252525; margin: 18px 0 4px; }
+
+/* Model tier selector */
+.tier-selector { display:flex; gap:4px; margin:10px 0 6px; padding:3px; background:rgba(255,255,255,.04); border-radius:10px; border:1px solid var(--border); }
+.tier-btn { flex:1; padding:7px 4px; border:0; border-radius:8px; background:transparent; color:var(--faint); font:11px var(--mono); letter-spacing:.02em; cursor:pointer; transition:.15s; white-space:nowrap; }
+.tier-btn:hover { color:var(--dim); background:rgba(255,255,255,.04); }
+.tier-btn.active { color:#111; background:var(--white); font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+@media (max-width:1180px) { .tier-selector { margin:10px 8px 6px; } }
 .settings-toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; cursor: pointer; }
 .settings-toggle span:first-child { font-size: 13px; color: var(--dim); }
 .settings-toggle input { display: none; }

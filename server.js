@@ -218,6 +218,7 @@ function pickAuto(cfg, body, mode) {
   const lastUser = [...(body.messages || [])].reverse().find(x => x.role === "user");
   const text = typeof (lastUser && lastUser.content) === "string" ? lastUser.content : "";
   const hasImages = Array.isArray(body.images) && body.images.length > 0;
+  const tier = body.tier || "balanced";
 
   const has = (key) => { const m = cfg.models[key]; return m && (m.provider === "ollama" || upstreamFor(cfg, m)); };
 
@@ -234,10 +235,28 @@ function pickAuto(cfg, body, mode) {
     if (has("gem35")) return "gem35";
     return "cbgemma";
   }
-  // Text-only: Schnelligkeit zuerst (Groq ~500 tok/s)
-  if (has("groq20")) return "groq20";           // instant: ~500 tok/s
-  if (has("groq120")) return "groq120";          // fast + smart
-  if (has("gem35")) return "gem35";              // fast + vision-fähig
+
+  // Text-only: tier-based selection
+  if (tier === "fast") {
+    // Schnell: Groq zuerst (~500 tok/s)
+    if (has("groq20")) return "groq20";
+    if (has("groq120")) return "groq120";
+    if (has("gem35")) return "gem35";
+    if (has("glm")) return "glm";
+    return "gem37";
+  }
+  if (tier === "smart") {
+    // Schlau: beste Modelle zuerst
+    if (has("gem37")) return "gem37";
+    if (has("groq120")) return "groq120";
+    if (has("glm")) return "glm";
+    if (has("gem35")) return "gem35";
+    return "groq20";
+  }
+  // Balanciert: mix aus speed + quality
+  if (has("groq120")) return "groq120";
+  if (has("groq20")) return "groq20";
+  if (has("gem35")) return "gem35";
   if (has("glm")) return "glm";
   return "gem37";
 }
