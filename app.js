@@ -1,4 +1,4 @@
-/* NOIR v3 — grok-grade client */
+/* NOIR v3 — KI-Client im Grok-Stil */
 const $ = (s) => document.querySelector(s);
 const chatEl = $("#chat"), inputEl = $("#input"), sendBtn = $("#sendBtn");
 const convList = $("#convList"), titleEl = $("#title"), statusLine = $("#statusLine");
@@ -27,8 +27,8 @@ function enhance(el) {
     const lang = (code.className.match(/language-([\w+-]+)/) || [])[1] || "code";
     head.innerHTML = `<span>${lang.toUpperCase()}</span>`;
     const btn = document.createElement("button");
-    btn.className = "copy-btn"; btn.textContent = "COPY";
-    btn.onclick = () => { navigator.clipboard.writeText(code.textContent); btn.textContent = "COPIED ✓"; setTimeout(() => btn.textContent = "COPY", 1200); };
+    btn.className = "copy-btn"; btn.textContent = "KOPIEREN";
+    btn.onclick = () => { navigator.clipboard.writeText(code.textContent); btn.textContent = "KOPIERT ✓"; setTimeout(() => btn.textContent = "KOPIEREN", 1200); };
     head.appendChild(btn);
     pre.replaceWith(block); block.appendChild(head); block.appendChild(pre);
   });
@@ -71,37 +71,37 @@ function addAiMsg() {
 
 function statsRow(s) {
   const d = document.createElement("div"); d.className = "stats";
-  d.innerHTML = `<span><b>${s.tps}</b> tok/s</span><span><b>${s.ttft}s</b> to first token</span><span><b>${s.total}s</b> total</span>`;
+  d.innerHTML = `<span><b>${s.tps}</b> Tok/s</span><span><b>${s.ttft}s</b> bis zum ersten Token</span><span><b>${s.total}s</b> gesamt</span>`;
   return d;
 }
 function sourcesBlock(srcs) {
   const d = document.createElement("div"); d.className = "sources";
-  const title = document.createElement("div"); title.className = "sources-title"; title.textContent = `${srcs.length} SOURCE${srcs.length === 1 ? "" : "S"} CONSULTED`;
+  const title = document.createElement("div"); title.className = "sources-title"; title.textContent = `${srcs.length} QUELLE${srcs.length === 1 ? "" : "N"} ABGERUFEN`;
   d.appendChild(title);
   srcs.forEach((s, i) => {
     const item = document.createElement("div"); item.className = "src";
     const n = document.createElement("span"); n.className = "n"; n.textContent = String(i + 1).padStart(2, "0");
-    const a = document.createElement("a"); a.href = /^https?:\/\//i.test(s.url || "") ? s.url : "#"; a.target = "_blank"; a.rel = "noopener"; a.textContent = s.title || s.url || "Untitled source";
+    const a = document.createElement("a"); a.href = /^https?:\/\//i.test(s.url || "") ? s.url : "#"; a.target = "_blank"; a.rel = "noopener"; a.textContent = s.title || s.url || "Unbenannte Quelle";
     item.append(n, a); d.appendChild(item);
   });
   return d;
 }
 function addActions(el, m) {
   const row = document.createElement("div"); row.className = "msg-actions";
-  const cp = document.createElement("button"); cp.className = "act-btn"; cp.textContent = "Copy";
-  cp.onclick = () => { navigator.clipboard.writeText(m.content); cp.textContent = "Copied ✓"; setTimeout(() => cp.textContent = "Copy", 1200); };
+  const cp = document.createElement("button"); cp.className = "act-btn"; cp.textContent = "Kopieren";
+  cp.onclick = () => { navigator.clipboard.writeText(m.content); cp.textContent = "Kopiert ✓"; setTimeout(() => cp.textContent = "Kopieren", 1200); };
   row.appendChild(cp);
-  const listen = document.createElement("button"); listen.className = "act-btn"; listen.textContent = "Listen";
+  const listen = document.createElement("button"); listen.className = "act-btn"; listen.textContent = "Anhören";
   listen.onclick = () => {
-    if (!("speechSynthesis" in window)) return toast("audio playback is not available here");
-    if (speechSynthesis.speaking) { speechSynthesis.cancel(); listen.textContent = "Listen"; return; }
+    if (!("speechSynthesis" in window)) return toast("Audio-Wiedergabe hier nicht verfügbar");
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); listen.textContent = "Anhören"; return; }
     const spoken = new SpeechSynthesisUtterance(m.content.replace(/[`#*_>]/g, " "));
-    spoken.rate = .96; spoken.onend = () => listen.textContent = "Listen"; listen.textContent = "Stop"; speechSynthesis.speak(spoken);
+    spoken.rate = .96; spoken.onend = () => listen.textContent = "Anhören"; listen.textContent = "Stopp"; speechSynthesis.speak(spoken);
   };
   row.appendChild(listen);
   const c = currentConv();
   if (c && c.messages[c.messages.length - 1] === m) {
-    const rg = document.createElement("button"); rg.className = "act-btn"; rg.textContent = "Retry";
+    const rg = document.createElement("button"); rg.className = "act-btn"; rg.textContent = "Erneut versuchen";
     rg.onclick = regenerate; row.appendChild(rg);
   }
   el.appendChild(row);
@@ -112,20 +112,20 @@ function renderChat() {
   const c = currentConv();
   titleEl.textContent = c ? c.title : "";
   const contextBadge = $("#contextBadge");
-  if (c?.messages?.length) { contextBadge.textContent = `${c.messages.length} messages`; contextBadge.classList.remove("hidden"); }
+  if (c?.messages?.length) { contextBadge.textContent = `${c.messages.length} Nachrichten`; contextBadge.classList.remove("hidden"); }
   else contextBadge.classList.add("hidden");
   if (!c || !c.messages.length) {
     chatEl.innerHTML = `<div class="hero">
-      <div class="hero-eyebrow"><i></i> PRIVATE INTELLIGENCE</div>
+      <div class="hero-eyebrow"><i></i> PRIVATES INTELLIGENZSYSTEM</div>
       <div class="hero-mark">NOIR</div>
-      <div class="hero-sub">A quiet place to think, search, build, and make sense of what matters.</div>
+      <div class="hero-sub">Ein ruhiger Ort zum Nachdenken, Suchen, Bauen und Verstehen.</div>
       <div id="heroSlot" style="width:100%;display:flex;justify-content:center"></div>
-      <div class="hero-hint"><span>⌘ K</span> command palette <b>·</b> <span>↵</span> send <b>·</b> <span>⇧ ↵</span> new line</div>
+      <div class="hero-hint"><span>⌘ K</span> Befehlspalette <b>·</b> <span>↵</span> Senden <b>·</b> <span>⇧ ↵</span> Neue Zeile</div>
       <div class="sugg-row">
-        <button class="sugg" data-p="Research the latest developments in "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">⌕ Deep research</div><div class="d">live web + cited sources</div></div></button>
-        <button class="sugg" data-p="Explain like I'm 15: "><div class="bg" style="background-image:url('assets/hero2.jpg')"></div><div class="fg"><div class="t">◈ Explain anything</div><div class="d">clear, simple answers</div></div></button>
-        <button class="sugg" data-p="Write a Python script that "><div class="bg" style="background-image:url('assets/hero3.jpg')"></div><div class="fg"><div class="t">⌗ Build code</div><div class="d">working scripts, fast</div></div></button>
-        <button class="sugg" data-p="Analyze this document: "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">▤ Read my PDF</div><div class="d">attach & ask anything</div></div></button>
+        <button class="sugg" data-p="Recherchiere die neuesten Entwicklungen in "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">⌕ Tiefenrecherche</div><div class="d">Live-Web + Quellenangaben</div></div></button>
+        <button class="sugg" data-p="Erkläre es mir wie einem 15-Jährigen: "><div class="bg" style="background-image:url('assets/hero2.jpg')"></div><div class="fg"><div class="t">◈ Alles erklären</div><div class="d">Klare, einfache Antworten</div></div></button>
+        <button class="sugg" data-p="Schreib ein Python-Skript das "><div class="bg" style="background-image:url('assets/hero3.jpg')"></div><div class="fg"><div class="t">⌗ Code bauen</div><div class="d">Funktionierende Skripte, schnell</div></div></button>
+        <button class="sugg" data-p="Analysiere dieses Dokument: "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">▤ Mein PDF lesen</div><div class="d">Anhängen & alles fragen</div></div></button>
       </div></div>`;
     chatEl.querySelectorAll(".sugg").forEach(b => b.onclick = () => { inputEl.value = b.dataset.p; inputEl.focus(); autosize(); });
   } else {
@@ -135,7 +135,7 @@ function renderChat() {
         const el = addAiMsg();
         if (m.thinking) {
           const tw = document.createElement("div"); tw.className = "think-wrap";
-          tw.innerHTML = `<details class="think"><summary>◦ thought process</summary><div class="think-body"></div></details>`;
+          tw.innerHTML = `<details class="think"><summary>◦ Denkprozess</summary><div class="think-body"></div></details>`;
           tw.querySelector(".think-body").textContent = m.thinking;
           el.parentElement.insertBefore(tw, el);
         }
@@ -156,7 +156,7 @@ function renderChat() {
             a.className = "file-chip";
             a.href = "/workspace/" + encodeURIComponent(f);
             a.target = "_blank";
-            a.innerHTML = `▤ ${f} <span class="dl">DOWNLOAD</span>`;
+            a.innerHTML = `▤ ${f} <span class="dl">HERUNTERLADEN</span>`;
             fr.appendChild(a);
           }
           el.parentElement.insertBefore(fr, el);
@@ -179,8 +179,8 @@ function renderConvs(filter = "") {
     const d = document.createElement("div");
     d.className = "conv-item" + (c.id === currentId ? " active" : "");
     const t = document.createElement("span"); t.className = "t"; t.textContent = c.title;
-    const pin = document.createElement("button"); pin.className = "conv-pin" + (c.pinned ? " pinned" : ""); pin.title = c.pinned ? "Unpin chat" : "Pin chat"; pin.setAttribute("aria-label", pin.title); pin.textContent = "⌁";
-    pin.onclick = (e) => { e.stopPropagation(); c.pinned = !c.pinned; saveConvs(); renderConvs(convSearch.value); toast(c.pinned ? "conversation pinned" : "conversation unpinned"); };
+    const pin = document.createElement("button"); pin.className = "conv-pin" + (c.pinned ? " pinned" : ""); pin.title = c.pinned ? "Chat lösen" : "Chat anheften"; pin.setAttribute("aria-label", pin.title); pin.textContent = "⌁";
+    pin.onclick = (e) => { e.stopPropagation(); c.pinned = !c.pinned; saveConvs(); renderConvs(convSearch.value); toast(c.pinned ? "Chat angeheftet" : "Chat gelöst"); };
     const x = document.createElement("button"); x.className = "conv-del"; x.textContent = "✕";
     x.onclick = (e) => { e.stopPropagation();
       conversations = conversations.filter(k => k.id !== c.id);
@@ -264,7 +264,7 @@ fileInput.onchange = async () => {
 async function doSend(text, imgs, files) {
   let c = currentConv();
   if (!c) {
-    c = { id: Date.now(), createdAt: new Date().toISOString(), title: text.slice(0, 40) || "new chat", messages: [] };
+    c = { id: Date.now(), createdAt: new Date().toISOString(), title: text.slice(0, 40) || "Neuer Chat", Nachrichten: [] };
     conversations.push(c); currentId = c.id;
   }
   let content = text;
@@ -275,7 +275,7 @@ async function doSend(text, imgs, files) {
   // leave hero mode
   chatEl.innerHTML = "";
   const t = threadEl();
-  addUserMsg(text || "(attachment)", imgs);
+  addUserMsg(text || "(Anhang)", imgs);
   placeComposer();
 
   const aiEl = addAiMsg();
@@ -290,11 +290,11 @@ async function doSend(text, imgs, files) {
 
   let webResults = null;
   if (webOn && !agentOn) {
-    statusLine.textContent = "searching the web…";
+    statusLine.textContent = "Durchsuche das Web…";
     try {
       webResults = await (await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 300)))).json();
-      statusLine.textContent = webResults.length ? `${webResults.length} sources found` : "no sources found";
-    } catch { statusLine.textContent = "search failed"; }
+      statusLine.textContent = webResults.length ? `${webResults.length} Quellen gefunden` : "Keine Quellen gefunden";
+    } catch { statusLine.textContent = "Suche fehlgeschlagen"; }
   } else statusLine.textContent = "";
 
   const sysPrompt = localStorage.getItem("noir_sys") ||
@@ -318,7 +318,7 @@ async function doSend(text, imgs, files) {
 
   function renderThink(open) {
     if (!thinkAcc) { thinkWrap.innerHTML = ""; return; }
-    thinkWrap.innerHTML = `<details class="think"${open ? " open" : ""}><summary>◦ thinking</summary><div class="think-body"></div></details>`;
+    thinkWrap.innerHTML = `<details class="think"${open ? " open" : ""}><summary>◦ Nachdenken…</summary><div class="think-body"></div></details>`;
     thinkWrap.querySelector(".think-body").textContent = thinkAcc;
   }
 
@@ -326,7 +326,7 @@ async function doSend(text, imgs, files) {
   const waitTimer = setInterval(() => {
     if (ttft !== null) { clearInterval(waitTimer); return; }
     const s = ((performance.now() - t0) / 1000).toFixed(0);
-    statusLine.textContent = agentOn ? "agent working… " + s + "s" : "thinking… " + s + "s";
+    statusLine.textContent = agentOn ? "Agent arbeitet… " + s + "s" : "Denke nach… " + s + "s";
   }, 500);
 
   try {
@@ -365,9 +365,9 @@ async function doSend(text, imgs, files) {
           a.className = "file-chip";
           a.href = "/workspace/" + encodeURIComponent(j.fileCreated);
           a.target = "_blank";
-          a.innerHTML = `▤ ${j.fileCreated} <span class="dl">DOWNLOAD</span>`;
+          a.innerHTML = `▤ ${j.fileCreated} <span class="dl">HERUNTERLADEN</span>`;
           traceEl.appendChild(a);
-          toast("file created: " + j.fileCreated);
+          toast("Datei erstellt: " + j.fileCreated);
           continue;
         }
         if (j.error) {
@@ -396,7 +396,7 @@ async function doSend(text, imgs, files) {
       }
     }
   } catch (e) {
-    if (e.name !== "AbortError") acc += (acc ? "\n\n" : "") + "⚠ connection lost: " + e.message;
+    if (e.name !== "AbortError") acc += (acc ? "\n\n" : "") + "⚠ Verbindung verloren: " + e.message;
   }
   clearInterval(waitTimer);
 
@@ -468,9 +468,9 @@ $("#newChatBtn").onclick = () => { currentId = null; renderChat(); renderConvs(c
   if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed"); };
 $("#attachBtn").onclick = () => fileInput.click();
 webBtn.onclick = () => { webOn = !webOn; webBtn.classList.toggle("on", webOn); agentOn = false; agentBtn.classList.remove("on");
-  statusLine.textContent = webOn ? "web research armed" : ""; };
+  statusLine.textContent = webOn ? "Web-Recherche aktiviert" : ""; };
 agentBtn.onclick = () => { agentOn = !agentOn; agentBtn.classList.toggle("on", agentOn); webOn = false; webBtn.classList.remove("on");
-  statusLine.textContent = agentOn ? "agent mode — I can search, read pages & calculate" : ""; };
+  statusLine.textContent = agentOn ? "Agentenmodus — Ich kann suchen, Seiten lesen & rechnen" : ""; };
 
 let toastTimer;
 function toast(msg) {
@@ -482,14 +482,14 @@ function toast(msg) {
 
 $("#exportBtn").onclick = () => {
   const c = currentConv();
-  if (!c || !c.messages.length) return toast("nothing to export yet");
-  let md = `# ${c.title}\n\n> exported from NOIR · ${new Date().toLocaleString()}\n\n`;
-  for (const m of c.messages) md += (m.role === "user" ? "## You\n\n" : "## NOIR\n\n") + m.content + "\n\n---\n\n";
+  if (!c || !c.messages.length) return toast("Noch nichts zum Exportieren");
+  let md = `# ${c.title}\n\n> Exportiert aus NOIR · ${new Date().toLocaleString()}\n\n`;
+  for (const m of c.messages) md += (m.role === "user" ? "## Du\n\n" : "## NOIR\n\n") + m.content + "\n\n---\n\n";
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
   a.download = (c.title || "chat").replace(/[^\w\- ]/g, "").trim().slice(0, 40) + ".md";
   a.click();
-  toast("exported as markdown ✓");
+  toast("Als Markdown exportiert ✓");
 };
 $("#menuBtn").onclick = () => $("#sidebar").classList.add("collapsed");
 $("#menuBtn2").onclick = () => $("#sidebar").classList.toggle("collapsed");
@@ -514,13 +514,13 @@ function renderCommandResults() {
   commandResults.innerHTML = "";
   if (!query) return;
   const matches = conversations.filter(c => c.title.toLowerCase().includes(query)).slice(-5).reverse();
-  if (!matches.length) { commandResults.innerHTML = '<div class="command-empty">No conversations match “' + commandInput.value.replace(/</g, "&lt;") + '”</div>'; return; }
-  commandResults.innerHTML = '<div class="command-section">CONVERSATIONS</div>';
+  if (!matches.length) { commandResults.innerHTML = '<div class="command-empty">Keine Gespräche passen zu “' + commandInput.value.replace(/</g, "&lt;") + '”</div>'; return; }
+  commandResults.innerHTML = '<div class="command-section">GESPRäCHE</div>';
   matches.forEach(c => {
     const b = document.createElement("button"); b.className = "command-item command-thread";
     const icon = document.createElement("span"); icon.className = "command-icon"; icon.textContent = "◌";
     const copy = document.createElement("span"); const name = document.createElement("strong"); const detail = document.createElement("small");
-    name.textContent = c.title; detail.textContent = `${c.messages?.length || 0} messages`; copy.append(name, detail); b.append(icon, copy);
+    name.textContent = c.title; detail.textContent = `${c.messages?.length || 0} Nachrichten`; copy.append(name, detail); b.append(icon, copy);
     b.onclick = () => { currentId = c.id; renderConvs(convSearch.value); renderChat(); closeCommand(); };
     commandResults.appendChild(b);
   });
@@ -558,7 +558,7 @@ $("#settingsBtn").onclick = async () => {
   $("#keyInput").value = "";
   $("#sysInput").value = localStorage.getItem("noir_sys") || "";
   const cfg = await (await fetch("/api/config")).json();
-  if (cfg.hasKey) $("#keyInput").placeholder = "saved — leave blank to keep";
+  if (cfg.hasKey) $("#keyInput").placeholder = "Gespeichert — leer lassen zum Behalten";
   modal.classList.remove("hidden");
   setTimeout(() => $("#keyInput").focus(), 0);
 };
@@ -580,7 +580,7 @@ $("#saveSettings").onclick = async () => {
     if (gcid) payload.googleClientId = gcid;
     await fetch("/api/config", { method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload) });
-    toast("saved ✓");
+    toast("Gespeichert ✓");
   }
   localStorage.setItem("noir_sys", $("#sysInput").value.trim());
   closeSettings(); loadModels();
@@ -606,7 +606,7 @@ function initNoir() {
   window.addEventListener("noir:splashDone", () => inputEl.focus(), { once: true });
   setTimeout(() => { const s = document.getElementById("splash"); if (s) s.remove(); }, 8000);
   inputEl.value = localStorage.getItem("noir_draft") || ""; autosize();
-  loadModels().then(renderChat).catch(() => toast("could not reach the local model service"));
+  loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));
   renderConvs();
   if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed");
 }

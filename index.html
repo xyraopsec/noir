@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -16,13 +16,27 @@
 </head>
 <body>
 
+<!-- Willkommens-Animation -->
+<div id="welcomeOverlay" class="welcome-overlay hidden" aria-hidden="true">
+  <div class="welcome-particles" id="welcomeParticles"></div>
+  <div class="welcome-content">
+    <div class="welcome-avatar-wrap">
+      <div class="welcome-avatar-ring"></div>
+      <img id="welcomeAvatar" class="welcome-avatar" src="assets/avatar.jpg" alt="Avatar">
+    </div>
+    <div class="welcome-name" id="welcomeName"></div>
+    <div class="welcome-sub">Bereit für deine nächsten Ideen</div>
+    <div class="welcome-dots"><span></span><span></span><span></span></div>
+  </div>
+</div>
+
 <!-- Access is verified by the local server before the application initializes. -->
 <section id="accessGate" aria-labelledby="accessTitle">
   <div class="gate-box">
     <div class="gate-mark">NOIR</div>
     <div id="googleBtnWrap"><div id="googleBtn"></div></div>
     <div id="googleMsg" class="gate-error"></div>
-    <button id="codeToggle" class="gate-alt">use access code instead</button>
+    <button id="codeToggle" class="gate-alt">Zugangscode verwenden</button>
     <form id="accessForm" novalidate class="hidden">
       <input id="accessCode" name="code" inputmode="text" autocapitalize="characters" maxlength="7" placeholder="XXX-XXX" autocomplete="off">
       <button type="submit" aria-label="Unlock">→</button>
@@ -37,14 +51,14 @@
   <div id="splashStage">
     <div id="splashWord"><span class="sl">N</span><span class="sl">O</span><span class="sl">I</span><span class="sl">R</span></div>
     <div id="splashLine"></div>
-    <div id="splashTag">PRIVATE&nbsp;INTELLIGENCE</div>
+    <div id="splashTag">PRIVATES&nbsp;INTELLIGENZSYSTEM</div>
   </div>
   <div id="splashVignette"></div>
   <button id="splashMute" title="sound">
     <svg id="sndOn" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
     <svg id="sndOff" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>
   </button>
-  <button id="splashSkip">skip ›</button>
+  <button id="splashSkip">überspringen ›</button>
 </div>
 
 <div id="app">
@@ -53,14 +67,14 @@
       <button id="menuBtn" class="bare-btn" title="collapse">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
       </button>
-      <div class="brand-lockup"><div class="logo">NOIR</div><span>PRIVATE AI</span></div>
+      <div class="brand-lockup"><div class="logo">NOIR</div><span>PRIVATES KI-SYSTEM</span></div>
     </div>
     <button id="newChatBtn" class="new-chat">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-      New chat
+      Neuer Chat
     </button>
-    <div class="side-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="convSearch" placeholder="Search chats"><kbd>⌘ K</kbd></div>
-    <div class="library-label"><span>YOUR THREADS</span><span id="threadCount"></span></div>
+    <div class="side-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="convSearch" placeholder="Chats durchsuchen"><kbd>⌘ K</kbd></div>
+    <div class="library-label"><span>DEINE THREADS</span><span id="threadCount"></span></div>
     <div id="convList"></div>
     <div class="side-bottom">
       <div class="conn-row">
@@ -69,9 +83,9 @@
       </div>
       <button id="settingsBtn" class="side-item">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        Settings
+        Einstellungen
       </button>
-      <div class="profile-card"><div class="profile-orb">N</div><div><strong>Private workspace</strong><span>Everything stays with you</span></div><span class="profile-more">•••</span></div>
+      <div class="profile-card"><div class="profile-orb">N</div><div><strong>Privater Arbeitsbereich</strong><span>Alles bleibt bei dir</span></div><span class="profile-more">•••</span></div>
     </div>
   </aside>
 
@@ -83,8 +97,8 @@
       <div id="title"></div>
       <span id="perfBadge" class="perf-badge hidden"></span>
       <span id="contextBadge" class="context-badge hidden"></span>
-      <button id="commandBtn" class="command-btn" title="Command palette"><span>⌘</span> Command</button>
-      <button id="exportBtn" class="bare-btn" title="export chat as markdown">
+      <button id="commandBtn" class="command-btn" title="Befehlspalette"><span>⌘</span> Befehl</button>
+      <button id="exportBtn" class="bare-btn" title="Chat als Markdown exportieren">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       </button>
     </header>
@@ -100,16 +114,16 @@
 <footer id="composerWrap">
   <div id="attachRow" class="hidden"></div>
   <div id="composer">
-    <button id="attachBtn" class="icon-ghost" title="attach PDF / image">
+    <button id="attachBtn" class="icon-ghost" title="PDF / Bild anhängen">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
     </button>
-    <button id="webBtn" class="icon-ghost" title="web research">
+    <button id="webBtn" class="icon-ghost" title="Web-Recherche">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
     </button>
-    <button id="agentBtn" class="icon-ghost" title="agent mode — autonomous tools">
+    <button id="agentBtn" class="icon-ghost" title="Agentenmodus — autonome Werkzeuge">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/><path d="M19 15l.9 2.6L22.5 18.5l-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z"/></svg>
     </button>
-    <textarea id="input" rows="1" placeholder="Ask anything"></textarea>
+    <textarea id="input" rows="1" placeholder="Frag mich alles"></textarea>
     <button id="sendBtn" title="send">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
@@ -122,42 +136,43 @@
 <!-- Settings -->
 <div id="settingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
   <div class="modal" tabindex="-1">
-    <div class="modal-heading"><div><span class="eyebrow">NOIR / CONTROL</span><h2 id="settingsTitle">Settings</h2></div><button id="closeSettingsX" class="modal-close" aria-label="Close settings">×</button></div>
-    <label>OpenRouter API key <span class="hint">free — openrouter.ai/keys</span></label>
+    <div class="modal-heading"><div><span class="eyebrow">NOIR / STEUERUNG</span><h2 id="settingsTitle">Einstellungen</h2></div><button id="closeSettingsX" class="modal-close" aria-label="Schließen">×</button></div>
+    <label>OpenRouter API-Schlüssel <span class="hint">kostenlos — openrouter.ai/keys</span></label>
     <input type="password" id="keyInput" placeholder="sk-or-v1-...">
-    <label>Groq API key <span class="hint">free — console.groq.com/keys · Llama 70B + 14k/day</span></label>
+    <label>Groq API-Schlüssel <span class="hint">kostenlos — console.groq.com/keys · Llama 70B + 14k/Tag</span></label>
     <input type="password" id="keyGroq" placeholder="gsk_...">
-    <label>Google Gemini API key <span class="hint">free — aistudio.google.com/apikey · VISION</span></label>
+    <label>Google Gemini API-Schlüssel <span class="hint">kostenlos — aistudio.google.com/apikey · VISION</span></label>
     <input type="password" id="keyGemini" placeholder="AIza...">
-    <label>Cerebras API key <span class="hint">optional — cloud.cerebras.ai</span></label>
+    <label>Cerebras API-Schlüssel <span class="hint">optional — cloud.cerebras.ai</span></label>
     <input type="password" id="keyCerebras" placeholder="csk-...">
-    <label>Mistral API key <span class="hint">optional — console.mistral.ai</span></label>
+    <label>Mistral API-Schlüssel <span class="hint">optional — console.mistral.ai</span></label>
     <input type="password" id="keyMistral" placeholder="...">
-    <label>Google OAuth Client ID <span class="hint">console.cloud.google.com → credentials → JS origin: localhost:3000</span></label>
+    <label>Google OAuth Client-ID <span class="hint">console.cloud.google.com → credentials → JS-Origin: localhost:3000</span></label>
     <input type="text" id="keyGoogleClient" placeholder="xxxxx.apps.googleusercontent.com">
-    <label>System prompt</label>
+    <label>Systemaufforderung</label>
     <textarea id="sysInput" rows="5"></textarea>
     <div class="modal-actions">
-      <button id="saveSettings" class="primary">Save</button>
-      <button id="closeSettings" class="ghost-flat">Cancel</button>
+      <button id="saveSettings" class="primary">Speichern</button>
+      <button id="closeSettings" class="ghost-flat">Abbrechen</button>
     </div>
   </div>
 </div>
 
 <div id="commandModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="Command palette">
   <div class="command-panel">
-    <div class="command-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="commandInput" placeholder="Type a command or search chats" autocomplete="off"><kbd>ESC</kbd></div>
-    <div class="command-section">QUICK ACTIONS</div>
-    <button class="command-item" data-command="new"><span class="command-icon">＋</span><span><strong>New conversation</strong><small>Start with a clean context</small></span><kbd>⌘ N</kbd></button>
-    <button class="command-item" data-command="research"><span class="command-icon">⌕</span><span><strong>Research mode</strong><small>Search the web with citations</small></span><kbd>⌘ R</kbd></button>
-    <button class="command-item" data-command="agent"><span class="command-icon">✦</span><span><strong>Agent mode</strong><small>Plan and use tools autonomously</small></span><kbd>⌘ A</kbd></button>
-    <button class="command-item" data-command="settings"><span class="command-icon">⚙</span><span><strong>Open settings</strong><small>Models, key, and system prompt</small></span></button>
+    <div class="command-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="commandInput" placeholder="Befehl eingeben oder Chats suchen" autocomplete="off"><kbd>ESC</kbd></div>
+    <div class="command-section">SCHNELLE AKTIONEN</div>
+    <button class="command-item" data-command="new"><span class="command-icon">＋</span><span><strong>Neues Gespräch</strong><small>Mit sauberem Kontext starten</small></span><kbd>⌘ N</kbd></button>
+    <button class="command-item" data-command="research"><span class="command-icon">⌕</span><span><strong>Recherchemodus</strong><small>Im Web suchen mit Quellenangaben</small></span><kbd>⌘ R</kbd></button>
+    <button class="command-item" data-command="agent"><span class="command-icon">✦</span><span><strong>Agentenmodus</strong><small>Planen und autonome Werkzeuge nutzen</small></span><kbd>⌘ A</kbd></button>
+    <button class="command-item" data-command="settings"><span class="command-icon">⚙</span><span><strong>Einstellungen öffnen</strong><small>Modelle, Schlüssel und Systemaufforderung</small></span></button>
     <div id="commandResults"></div>
-    <div class="command-footer"><span><b>↵</b> to select</span><span><b>↑↓</b> to navigate</span><span><b>ESC</b> to close</span></div>
+    <div class="command-footer"><span><b>↵</b> zum Auswählen</span><span><b>↑↓</b> zum Navigieren</span><span><b>ESC</b> zum Schließen</span></div>
   </div>
 </div>
 
 <script src="access.js"></script>
+<script src="welcome.js"></script>
 <script src="splash.js"></script>
 <script>
 if (location.search.includes("debug")) {

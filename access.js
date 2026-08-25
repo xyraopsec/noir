@@ -1,4 +1,4 @@
-/* NOIR access gate — Google sign-in (allowlist) with access-code fallback. Stateless. */
+/* NOIR access gate — Google-Anmeldung (Allowlist) mit Zugangscode-Fallback. Stateless. */
 (function () {
   const gate = document.getElementById("accessGate");
   const googleWrap = document.getElementById("googleBtnWrap");
@@ -8,7 +8,6 @@
   const input = document.getElementById("accessCode");
   const error = document.getElementById("accessError");
 
-  // attach the credential to every API/workspace call
   const origFetch = window.fetch.bind(window);
   window.fetch = (url, opts = {}) => {
     const u = String(url);
@@ -22,26 +21,31 @@
     window.noirAccessGranted = true;
     document.body.classList.add("access-granted");
     gate.setAttribute("aria-hidden", "true");
-    window.dispatchEvent(new Event("noir:accessGranted"));
+    if (typeof window.showWelcome === "function") {
+      window.showWelcome(function () {
+        window.dispatchEvent(new Event("noir:accessGranted"));
+      });
+    } else {
+      window.dispatchEvent(new Event("noir:accessGranted"));
+    }
   }
 
-  /* ---- google flow ---- */
+  /* ---- Google-Fluss ---- */
   let clientId = "";
   origFetch("/api/auth/config").then(r => r.json()).then(c => {
     clientId = c.clientId || "";
     if (!clientId) {
-      googleMsg.textContent = "google sign-in not configured yet — owner must add the client id in settings";
+      googleMsg.textContent = "Google-Anmeldung nicht konfiguriert — Inhaber muss die Client-ID in den Einstellungen eintragen";
       return;
     }
     if (!window.google || !window.google.accounts) {
-      // gsi script blocked or not loaded yet
-      googleMsg.textContent = "google sign-in unavailable here — use the access code";
+      googleMsg.textContent = "Google-Anmeldung hier nicht verfügbar — Zugangscode verwenden";
       return;
     }
     window.google.accounts.id.initialize({
       client_id: clientId,
       callback: async (resp) => {
-        googleMsg.textContent = "verifying…";
+        googleMsg.textContent = "Überprüfung…";
         try {
           const r = await origFetch("/api/auth/google", {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -52,20 +56,20 @@
             localStorage.setItem("noir_code", j.token);
             grant();
           } else {
-            googleMsg.textContent = j.error || "sign-in rejected";
+            googleMsg.textContent = j.error || "Anmeldung abgelehnt";
           }
-        } catch { googleMsg.textContent = "could not reach the server"; }
+        } catch { googleMsg.textContent = "Server nicht erreichbar"; }
       }
     });
     window.google.accounts.id.renderButton(document.getElementById("googleBtn"), {
       theme: "filled_black", size: "large", shape: "pill", text: "signin_with", width: 260
     });
-  }).catch(() => { googleMsg.textContent = "server unreachable"; });
+  }).catch(() => { googleMsg.textContent = "Server nicht erreichbar"; });
 
-  /* ---- code fallback ---- */
+  /* ---- Code-Fallback ---- */
   codeToggle.onclick = () => {
     form.classList.toggle("hidden");
-    codeToggle.textContent = form.classList.contains("hidden") ? "use access code instead" : "use google sign-in instead";
+    codeToggle.textContent = form.classList.contains("hidden") ? "Zugangscode verwenden" : "Google-Anmeldung verwenden";
     if (!form.classList.contains("hidden")) input.focus();
   };
 
@@ -77,9 +81,9 @@
       const r = await origFetch("/api/access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
       if (r.ok) { localStorage.setItem("noir_code", code); grant(); return true; }
       localStorage.removeItem("noir_code");
-      if (!silent) { error.textContent = "That code is not recognized."; input.select(); }
+      if (!silent) { error.textContent = "Dieser Code ist nicht bekannt."; input.select(); }
     } catch {
-      if (!silent) error.textContent = "Unable to reach the server.";
+      if (!silent) error.textContent = "Server nicht erreichbar.";
     }
     return false;
   }
@@ -87,7 +91,6 @@
   const stored = localStorage.getItem("noir_code") || "";
   if (stored && !stored.startsWith("noir1.")) verifyCode(stored, true);
   else if (stored) {
-    // trust stored google token locally; server re-validates on every call
     grant();
   }
   else setTimeout(() => { try { input.focus(); } catch {} }, 150);
@@ -95,7 +98,7 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const code = input.value.trim();
-    if (!/^[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(code)) { error.textContent = "Use the XXX-XXX format."; input.focus(); return; }
+    if (!/^[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(code)) { error.textContent = "Format: XXX-XXX"; input.focus(); return; }
     const button = form.querySelector("button"); button.disabled = true; button.textContent = "…";
     const ok = await verifyCode(code, false);
     if (!ok) input.select();

@@ -260,7 +260,7 @@ async function handleChat(req, res) {
   if (body.chatModel === "auto") {
     const picked = pickAuto(cfg, body, "chat");
     m = cfg.models[picked] || m;
-    autoNote = "auto -> " + (m.label || picked);
+    autoNote = "Auto -> " + (m.label || picked);
   }
   let messages = Array.isArray(body.messages) ? body.messages.map(x => ({ role: x.role, content: x.content })) : [];
 
@@ -318,7 +318,7 @@ async function handleChat(req, res) {
     res.write(`data: ${JSON.stringify({ notice: autoNote })}\n\n`);
   }
   if (usedId !== m.id) {
-    res.write(`data: ${JSON.stringify({ notice: "switched to " + usedId })}\n\n`);
+    res.write(`data: ${JSON.stringify({ notice: "Wechsel zu " + usedId })}\n\n`);
   }
   const reader = ur.body.getReader();
   try { for (;;) { const { done, value } = await reader.read(); if (done) break; res.write(Buffer.from(value)); } } catch {}
