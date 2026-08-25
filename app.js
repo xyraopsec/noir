@@ -235,11 +235,11 @@ function resizeImg(dataUrl) {
   return new Promise((res) => {
     const im = new Image();
     im.onload = () => {
-      const max = 1024, sc = Math.min(1, max / Math.max(im.width, im.height));
+      const max = 512, sc = Math.min(1, max / Math.max(im.width, im.height));
       const cv = document.createElement("canvas");
       cv.width = im.width * sc; cv.height = im.height * sc;
       cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
-      res(cv.toDataURL("image/jpeg", 0.85));
+      res(cv.toDataURL("image/jpeg", 0.6));
     };
     im.src = dataUrl;
   });
