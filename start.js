@@ -16,7 +16,7 @@ const config = {
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     secret: process.env.GOOGLE_SECRET || "noir-prod-secret",
-    allowlist: [
+    allowed: [
       "andi.selmani@stud.sek-ds.ch",
       "david.salgado@stud.sek-ds.ch",
       "david.rosario@stud.sek-ds.ch",
