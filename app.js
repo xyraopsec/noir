@@ -14,6 +14,17 @@ let pendingImgs = [], pendingFiles = [], webOn = false, agentOn = false;
 const currentConv = () => conversations.find(c => c.id === currentId);
 const saveConvs = () => localStorage.setItem("noir_convs", JSON.stringify(conversations));
 
+/* ---------------- OCR: Bild zu Text ---------------- */
+async function ocrImage(dataUrl) {
+  try {
+    if (typeof Tesseract === "undefined") return "";
+    statusLine.textContent = "Text aus Bild wird erkannt...";
+    const result = await Tesseract.recognize(dataUrl, "deu+eng", { logger: () => {} });
+    const text = (result.data.text || "").trim();
+    return text.length > 15 ? text : "";
+  } catch { return ""; }
+}
+
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
 
 /* ---------------- markdown ---------------- */
@@ -269,7 +280,22 @@ async function doSend(text, imgs, files) {
   }
   let content = text;
   for (const f of files) content += `\n\n--- FILE: ${f.name} ---\n${f.text}`;
-  c.messages.push({ role: "user", content, images: imgs });
+
+  // OCR: versuche Text aus Bildern zu lesen, bevor Vision benutzt wird
+  let ocrTexts = [];
+  let imgsToSend = imgs;
+  if (imgs.length > 0) {
+    for (const imgData of imgs) {
+      const extracted = await ocrImage(imgData);
+      if (extracted) ocrTexts.push(extracted);
+    }
+    if (ocrTexts.length > 0) {
+      content += "\n\n--- TEXT AUS BILDERN (OCR) ---\n" + ocrTexts.join("\n\n");
+      imgsToSend = [];
+    }
+  }
+
+  c.messages.push({ role: "user", content, images: imgsToSend });
   renderConvs(convSearch.value); saveConvs();
 
   // leave hero mode
@@ -298,7 +324,7 @@ async function doSend(text, imgs, files) {
   } else statusLine.textContent = "";
 
   const sysPrompt = localStorage.getItem("noir_sys") ||
-    "You are NOIR, a sharp, honest, private AI. Be precise and thorough. Use markdown, code blocks with language tags, and tables where useful. If a request is ambiguous, ask one short clarifying question first. When web results are provided, ground answers in them and cite as [n].";
+    "Du bist NOIR, ein klarer und ehrlicher Privat-Assistent. Antworte kurz und direkt. Keine Em-Dashes, keine Umschweife. Erklaere Dinge einfach, wie einem Freund. Nutze Markdown, Code-Blöcke mit Sprach-Tags und Tabellen wenn sinnvoll. Bei unklaren Fragen erst kurz nachfragen. Bei Web-Ergebnissen diese als Quellen mit [n] zitieren.";
 
   const apiMessages = [{ role: "system", content: sysPrompt },
     ...c.messages.map(m => ({ role: m.role, content: m.content }))];
@@ -333,7 +359,7 @@ async function doSend(text, imgs, files) {
     const res = await fetch(agentOn ? "/api/agent" : "/api/chat", {
       method: "POST", signal: aborter.signal,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatModel: "auto", messages: apiMessages, images: imgs, webResults })
+      body: JSON.stringify({ chatModel: "auto", messages: apiMessages, images: imgsToSend, webResults })
     });
     const reader = res.body.getReader();
     const dec = new TextDecoder();
@@ -416,6 +442,7 @@ async function doSend(text, imgs, files) {
   saveConvs(); renderConvs(convSearch.value);
   addActions(aiEl, aiMsg);
   finishSend();
+  if (autoRead && acc) speakText(acc);
   autoTitle(c);
 }
 
@@ -456,6 +483,58 @@ function regenerate() {
   while (c.messages.length && c.messages[c.messages.length - 1].role === "assistant") c.messages.pop();
   saveConvs(); renderChat();
   doSend("", [], []);
+}
+
+/* ---------------- voice chat ---------------- */
+let voiceOn = false, recognition = null;
+const voiceBtn = $("#voiceBtn"), readBtn = $("#readBtn");
+
+if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = "de-DE";
+
+  recognition.onresult = (e) => {
+    let transcript = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+    inputEl.value = transcript;
+    autosize();
+  };
+  recognition.onend = () => {
+    voiceOn = false;
+    voiceBtn.classList.remove("on");
+    const txt = inputEl.value.trim();
+    if (txt) send();
+  };
+  recognition.onerror = () => { voiceOn = false; voiceBtn.classList.remove("on"); };
+}
+
+voiceBtn.onclick = () => {
+  if (!recognition) return toast("Spracherkennung wird von diesem Browser nicht unterstuetzt");
+  if (voiceOn) { recognition.stop(); voiceOn = false; voiceBtn.classList.remove("on"); return; }
+  voiceOn = true;
+  voiceBtn.classList.add("on");
+  statusLine.textContent = "Hoere zu...";
+  recognition.start();
+};
+
+let autoRead = false;
+readBtn.onclick = () => {
+  autoRead = !autoRead;
+  readBtn.classList.toggle("on", autoRead);
+  toast(autoRead ? "Antwort wird automatisch vorgelesen" : "Auto-Vorlesen deaktiviert");
+};
+
+function speakText(text) {
+  if (!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const clean = text.replace(/[`#*_>\[\]]/g, " ").replace(/\s+/g, " ").trim();
+  const spoken = new SpeechSynthesisUtterance(clean.slice(0, 3000));
+  spoken.lang = "de-DE";
+  spoken.rate = 0.95;
+  speechSynthesis.speak(spoken);
 }
 
 /* ---------------- misc ---------------- */

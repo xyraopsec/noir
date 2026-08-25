@@ -344,10 +344,10 @@ function calculate(expr) {
   catch { return "calculation error"; }
 }
 
-const AGENT_SYSTEM = `You are NOIR, an autonomous agent with tools. Reply ONLY with minified JSON, no markdown, no code fences.
-To use a tool: {"thought":"why","tool":"web_search|read_url|calculate|now|write_file|read_file|list_files","args":{"query":"..."} or {"url":"..."} or {"expression":"..."} or {"filename":"report.md","content":"full file text"}}
-To give the final answer: {"final":"your complete markdown answer with [n] source citations if web was used"}
-Rules: you have a maximum of 5 tool calls - do not repeat similar searches. If the user asks for a document, essay, code file, list, or anything file-like, CREATE it with write_file (full content inside), then mention the filename in your final answer. Always finish with {"final":...}. Use calculate for math on numbers you found.`;
+const AGENT_SYSTEM = `Du bist NOIR, ein autonomer Agent mit Werkzeugen. Antworte NUR mit minifiziertem JSON, kein Markdown, keine Code-Fences.
+Werkzeug benutzen: {"thought":"warum","tool":"web_search|read_url|calculate|now|write_file|read_file|list_files","args":{"query":"..."} oder {"url":"..."} oder {"expression":"..."} oder {"filename":"bericht.md","content":"voller Dateitext"}}
+Finale Antwort: {"final":"deine komplette Markdown-Antwort mit [n] Quellenangaben wenn Web benutzt wurde"}
+Regeln: Maximal 5 Werkzeugaufrufe, keine identischen Suchen. Wenn der User ein Dokument, einen Aufsatz, Code, eine Liste oder aehnliches will, ERSTELLE es mit write_file (voller Inhalt), erwaehne dann den Dateinamen in deiner Antwort. Immer mit {"final":...} beenden. Benutze calculate fuer Mathematik mit Zahlen aus den Suchergebnissen.`;
 
 const runTool = async (name, args) => {
   try {
@@ -502,7 +502,7 @@ async function handleTitle(req, res) {
     const anyCloudKey = Object.values(cfg.providers || {}).some(p => p && p.key);
     if (anyCloudKey) {
       const out = await callModel(cfg, cfg.titleModel || "openrouter|nvidia/nemotron-3.5-lightning:free", [
-        { role: "system", content: "Create a title of 2-5 words for this conversation. Reply with ONLY the title, no quotes, no punctuation at the end. Match the user's language." },
+        { role: "system", content: "Erstelle einen 2-5 woertigen Titel fuer dieses Gespraech. Antworte NUR mit dem Titel, keine Anfuehrungszeichen, kein Satzzeichen am Ende. Sprache wie der User." },
         { role: "user", content: text }
       ]);
       title = out.replace(/["'.]/g, "").trim().slice(0, 48);

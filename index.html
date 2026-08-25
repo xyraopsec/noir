@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -39,7 +40,7 @@
     <button id="codeToggle" class="gate-alt">Zugangscode verwenden</button>
     <form id="accessForm" novalidate class="hidden">
       <input id="accessCode" name="code" inputmode="text" autocapitalize="characters" maxlength="7" placeholder="XXX-XXX" autocomplete="off">
-      <button type="submit" aria-label="Unlock">→</button>
+      <button type="submit" aria-label="Freischalten">→</button>
     </form>
     <p id="accessError" class="gate-error" role="alert" aria-live="polite"></p>
   </div>
@@ -104,8 +105,8 @@
     </header>
 
     <div id="chat"></div>
-    <button id="jumpLatest" class="jump-latest hidden" title="Jump to latest message" aria-label="Jump to latest message">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/><path d="M12 4v11"/></svg><span>Latest</span>
+    <button id="jumpLatest" class="jump-latest hidden" title="Zum letzten Nachricht springen" aria-label="Zum letzten Nachricht springen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 10 5 5 5-5"/><path d="M12 4v11"/></svg><span>Unten</span>
     </button>
   </main>
 </div>
@@ -124,6 +125,12 @@
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/><path d="M19 15l.9 2.6L22.5 18.5l-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z"/></svg>
     </button>
     <textarea id="input" rows="1" placeholder="Frag mich alles"></textarea>
+    <button id="voiceBtn" class="icon-ghost" title="Sprachmodus">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <button id="readBtn" class="icon-ghost" title="Antwort vorlesen">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+    </button>
     <button id="sendBtn" title="send">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>

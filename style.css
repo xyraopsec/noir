@@ -173,6 +173,8 @@ button { font-family: inherit; }
   align-items: center; justify-content: center; transition: .15s; flex-shrink: 0; }
 .icon-ghost:hover { color: var(--text); background: var(--surface2); }
 .icon-ghost.on { color: #000; background: var(--white); }
+#voiceBtn.on { color: #fff; background: #e44; animation: voicePulse 1.2s ease-in-out infinite; }
+@keyframes voicePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(238,68,68,.4); } 50% { box-shadow: 0 0 0 8px rgba(238,68,68,0); } }
 #sendBtn { width: 34px; height: 34px; border-radius: 11px; border: none; background: var(--white);
   color: #000; cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: .15s; flex-shrink: 0; }
