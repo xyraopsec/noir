@@ -222,30 +222,24 @@ function pickAuto(cfg, body, mode) {
   const has = (key) => { const m = cfg.models[key]; return m && (m.provider === "ollama" || upstreamFor(cfg, m)); };
 
   if (mode === "agent") {
-    if (has("glm")) return "glm";               // strictest JSON discipline
+    if (has("glm")) return "glm";
     if (has("groq120")) return "groq120";
     if (has("nv70")) return "nv70";
     return "gem37";
   }
   if (hasImages) {
-    if (has("gem37")) return "gem37";           // best vision
+    if (has("gem37")) return "gem37";
     if (has("vision")) return "vision";
     if (has("nvvision")) return "nvvision";
     if (has("gem35")) return "gem35";
     return "cbgemma";
   }
-  if (/\b(research|latest|news|search|current|today|source|cite|compare|market|politics)\b/i.test(text)) {
-    if (has("gem37")) return "gem37";           // fresh + smart
-    if (has("glm")) return "glm";
-  }
-  if (text.length > 600 || /\b(explain|analyze|essay|proof|solve|derive|why|refactor|architect|debug|write|story|math)\b/i.test(text)) {
-    if (has("gem37")) return "gem37";
-    if (has("glm")) return "glm";
-    if (has("groq120")) return "groq120";
-  }
-  if (has("groq20")) return "groq20";           // quick tasks: fast tier
-  if (has("gem35")) return "gem35";
-  return "glm";
+  // Text-only: Schnelligkeit zuerst (Groq ~500 tok/s)
+  if (has("groq20")) return "groq20";           // instant: ~500 tok/s
+  if (has("groq120")) return "groq120";          // fast + smart
+  if (has("gem35")) return "gem35";              // fast + vision-fähig
+  if (has("glm")) return "glm";
+  return "gem37";
 }
 
 /* ---------------- chat (streaming) ---------------- */
