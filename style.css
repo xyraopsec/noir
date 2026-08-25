@@ -19,13 +19,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 button { font-family: inherit; }
 .hidden { display: none !important; }
 .mobile-only { display: none; }
-@media (max-width: 1180px) { .mobile-only { display: flex; } }
 
 #app { display: flex; height: 100vh; }
 
 /* ================= sidebar ================= */
 .sidebar-backdrop { display: none; }
-@media (max-width: 1180px) {
+@media (max-width: 700px) {
   .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 55;
     background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
     transition: opacity .25s ease; }
@@ -34,10 +33,6 @@ button { font-family: inherit; }
 #sidebar { width: 244px; min-width: 244px; background: var(--bg-side);
   display: flex; flex-direction: column; padding: 14px 12px; transition: margin .28s cubic-bezier(.4,0,.2,1); }
 #sidebar.collapsed { margin-left: -245px; transform: none; }
-@media (max-width: 1180px) {
-  #sidebar.collapsed { margin-left: 0; transform: translateX(-100%); }
-  #sidebar:not(.collapsed) { transform: translateX(0); }
-}
 .side-top { display: flex; align-items: center; gap: 10px; padding: 4px 6px 18px; }
 .logo { font-weight: 600; letter-spacing: .35em; font-size: 14px; color: var(--white); }
 .bare-btn { background: none; border: none; color: var(--dim); cursor: pointer; padding: 7px;
@@ -641,18 +636,10 @@ body { background:#090909; }
   html { overflow: hidden; }
   body { overflow: hidden; -webkit-overflow-scrolling: touch; }
 
-  /* Sidebar: fixed, no push, overlay only */
-  #sidebar {
-    position: fixed; z-index: 60; height: 100dvh;
-    width: 260px; min-width: 260px;
-    transition: transform .28s cubic-bezier(.4,0,.2,1);
-    will-change: transform;
-  }
-  #sidebar.collapsed { transform: translateX(-100%); }
-  #sidebar:not(.collapsed) { transform: translateX(0); box-shadow: 40px 0 90px rgba(0,0,0,.9); }
+  /* Sidebar bleibt sichtbar wie am Desktop — kein Overlay, kein Klick nötig */
 
-  /* Main area: never shifts */
-  #main { width: 100%; min-width: 0; }
+  /* Main area: normal */
+  #main { min-width: 0; }
 
   /* Topbar: sticky, no bounce */
   #topbar {
@@ -729,9 +716,6 @@ body { background:#090909; }
 
   /* Command palette on iPad */
   .command-panel { width: min(520px, calc(100vw - 32px)); }
-
-  /* Sidebar backdrop */
-  .sidebar-backdrop { display: block; }
 }
 
 /* iPad portrait specifically */

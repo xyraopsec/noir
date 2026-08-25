@@ -213,7 +213,7 @@ function renderConvs(filter = "") {
     d.append(t, pin, x);
     d.onclick = () => { currentId = c.id;
       saveConvs(); renderConvs(convSearch.value); renderChat();
-      if (window.innerWidth <= 1180) closeSidebar(); };
+      if (window.innerWidth <= 700) closeSidebar(); };
     convList.appendChild(d);
   }
 }
@@ -694,7 +694,7 @@ sendBtn.onclick = () => { if (busy) aborter?.abort(); else send(); };
 inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
 inputEl.addEventListener("input", () => { localStorage.setItem("noir_draft", inputEl.value); autosize(); });
 $("#newChatBtn").onclick = () => { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus();
-  if (window.innerWidth <= 1180) closeSidebar(); };
+  if (window.innerWidth <= 700) closeSidebar(); };
 $("#attachBtn").onclick = () => fileInput.click();
 webBtn.onclick = () => { webOn = !webOn; webBtn.classList.toggle("on", webOn); agentOn = false; agentBtn.classList.remove("on");
   statusLine.textContent = webOn ? "Web-Recherche aktiviert" : ""; };
@@ -724,7 +724,7 @@ function toggleSidebar() {
   const sb = $("#sidebar");
   const bd = $("#sidebarBackdrop");
   sb.classList.toggle("collapsed");
-  if (window.innerWidth <= 1180) {
+  if (window.innerWidth <= 700) {
     const open = !sb.classList.contains("collapsed");
     if (bd) bd.classList.toggle("hidden", !open);
   }
@@ -865,7 +865,7 @@ function initNoir() {
   loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));
   renderConvs();
   applyProfile();
-  if (window.innerWidth <= 1180) closeSidebar();
+  if (window.innerWidth <= 700) closeSidebar();
 }
 if (window.noirAccessGranted) initNoir();
 else window.addEventListener("noir:accessGranted", initNoir, { once: true });
