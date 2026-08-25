@@ -21,12 +21,9 @@
     window.noirAccessGranted = true;
     document.body.classList.add("access-granted");
     gate.setAttribute("aria-hidden", "true");
+    window.dispatchEvent(new Event("noir:accessGranted"));
     if (typeof window.showWelcome === "function") {
-      window.showWelcome(function () {
-        window.dispatchEvent(new Event("noir:accessGranted"));
-      });
-    } else {
-      window.dispatchEvent(new Event("noir:accessGranted"));
+      window.showWelcome(function () {});
     }
   }
 
