@@ -1,4 +1,4 @@
-/* NOIR Willkommens-Animation —个人化的 Begrüßung nach dem Login */
+/* NOIR Willkommens-Animation — personalisierte Begrüßung nach dem Login */
 (function () {
   const overlay = document.getElementById("welcomeOverlay");
   const nameEl = document.getElementById("welcomeName");
@@ -36,6 +36,27 @@
     } catch { return null; }
   }
 
+  function showNoirSplash(onDone) {
+    const splash = document.getElementById("splash");
+    if (!splash) { onDone(); return; }
+    splash.classList.remove("done");
+    splash.style.display = "";
+    splash.style.opacity = "";
+    splash.style.pointerEvents = "";
+    const stage = document.getElementById("splashStage");
+    if (stage) stage.style.transform = "";
+    const letters = splash.querySelectorAll(".sl");
+    letters.forEach(l => { l.style.animation = "none"; l.offsetHeight; l.style.animation = ""; });
+    const line = document.getElementById("splashLine");
+    if (line) { line.style.animation = "none"; line.offsetHeight; line.style.animation = ""; }
+    const tag = document.getElementById("splashTag");
+    if (tag) { tag.style.animation = "none"; tag.offsetHeight; tag.style.animation = ""; }
+    setTimeout(() => {
+      splash.classList.add("done");
+      setTimeout(() => { splash.style.display = "none"; onDone(); }, 900);
+    }, 2800);
+  }
+
   window.showWelcome = function (onDone) {
     const email = decodeEmail();
     const user = USERS[email] || { name: "Gast", avatar: "assets/avatar.jpg" };
@@ -54,7 +75,7 @@
         overlay.classList.add("hidden");
         overlay.setAttribute("aria-hidden", "true");
         particlesEl.innerHTML = "";
-        if (onDone) onDone();
+        showNoirSplash(onDone || function () {});
       }, 700);
     }, 2800);
   };

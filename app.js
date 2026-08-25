@@ -205,7 +205,7 @@ function renderConvs(filter = "") {
     d.append(t, pin, x);
     d.onclick = () => { currentId = c.id;
       saveConvs(); renderConvs(convSearch.value); renderChat();
-      if (window.innerWidth <= 700) closeSidebar(); };
+      if (window.innerWidth <= 1180) closeSidebar(); };
     convList.appendChild(d);
   }
 }
@@ -318,7 +318,7 @@ async function doSend(text, imgs, files) {
   } else statusLine.textContent = "";
 
   const sysPrompt = localStorage.getItem("noir_sys") ||
-    "Du bist NOIR, ein klarer und ehrlicher Privat-Assistent. Antworte kurz und direkt. Keine Em-Dashes, keine Umschweife. Erklaere Dinge einfach, wie einem Freund. Nutze Markdown, Code-Blöcke mit Sprach-Tags und Tabellen wenn sinnvoll. Bei unklaren Fragen erst kurz nachfragen. Bei Web-Ergebnissen diese als Quellen mit [n] zitieren.";
+    "Du bist NOIR, ein klarer und ehrlicher Privat-Assistent. Antworte kurz und direkt. Keine Em-Dashes, keine Umschweife. Erklaere Dinge einfach, wie einem Freund. Nutze Markdown, Code-Blöcke mit Sprach-Tags und Tabellen wenn sinnvoll. Bei unklaren Fragen erst kurz nachfragen. WICHTIG: Wenn du merkst, dass die Frage aktuelle oder zeitgebundene Informationen erfordert (z.B. aktuelle Kurse, Nachrichten, Release-Daten, Wetter, Ereignisse), froege IMMER nach ob der User eine Websuche moechte, oder schlage automatisch eine Websuche vor. Nutze dabei [n] Quellenangaben.";
 
   const apiMessages = [{ role: "system", content: sysPrompt },
     ...c.messages.map(m => ({ role: m.role, content: m.content }))];
@@ -559,12 +559,15 @@ async function startRecording() {
           inputEl.value = (inputEl.value ? inputEl.value + " " : "") + data.text.trim();
           autosize();
           setVoiceStatus("✓ Erkannt — Enter zum Senden", "success");
+          setTimeout(() => setVoiceStatus("", ""), 3000);
         } else {
           setVoiceStatus("Keine Sprache erkannt — versuche es nochmal", "error");
+          setTimeout(() => setVoiceStatus("", ""), 3000);
         }
       } catch (e) {
         console.warn("Transcribe error:", e);
         setVoiceStatus("Transkription fehlgeschlagen", "error");
+        setTimeout(() => setVoiceStatus("", ""), 3000);
       }
       voiceBtn.classList.remove("on", "listening", "processing");
     };
@@ -640,7 +643,7 @@ sendBtn.onclick = () => { if (busy) aborter?.abort(); else send(); };
 inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
 inputEl.addEventListener("input", () => { localStorage.setItem("noir_draft", inputEl.value); autosize(); });
 $("#newChatBtn").onclick = () => { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus();
-  if (window.innerWidth <= 700) closeSidebar(); };
+  if (window.innerWidth <= 1180) closeSidebar(); };
 $("#attachBtn").onclick = () => fileInput.click();
 webBtn.onclick = () => { webOn = !webOn; webBtn.classList.toggle("on", webOn); agentOn = false; agentBtn.classList.remove("on");
   statusLine.textContent = webOn ? "Web-Recherche aktiviert" : ""; };
@@ -670,7 +673,7 @@ function toggleSidebar() {
   const sb = $("#sidebar");
   const bd = $("#sidebarBackdrop");
   sb.classList.toggle("collapsed");
-  if (window.innerWidth <= 700) {
+  if (window.innerWidth <= 1180) {
     const open = !sb.classList.contains("collapsed");
     if (bd) bd.classList.toggle("hidden", !open);
   }
@@ -747,6 +750,9 @@ $("#settingsBtn").onclick = async () => {
   lastModalTrigger = document.activeElement;
   $("#keyInput").value = "";
   $("#sysInput").value = localStorage.getItem("noir_sys") || "";
+  $("#settAutoRead").checked = localStorage.getItem("noir_autoread") === "true";
+  $("#settWebOn").checked = localStorage.getItem("noir_web_default") === "true";
+  $("#settAgentOn").checked = localStorage.getItem("noir_agent_default") === "true";
   const cfg = await (await fetch("/api/config")).json();
   if (cfg.hasKey) $("#keyInput").placeholder = "Gespeichert — leer lassen zum Behalten";
   modal.classList.remove("hidden");
@@ -759,7 +765,7 @@ modal.addEventListener("click", e => { if (e.target === modal) closeSettings(); 
 $("#saveSettings").onclick = async () => {
   const key = $("#keyInput").value.trim();
   const providerKeys = {};
-  for (const [id, name] of [["keyGroq","groq"],["keyGemini","gemini"],["keyCerebras","cerebras"],["keyMistral","mistral"]]) {
+  for (const [id, name] of [["keyGroq","groq"],["keyGemini","gemini"],["keyCerebras","cerebras"]]) {
     const v = $("#" + id).value.trim();
     if (v) providerKeys[name] = v;
   }
@@ -773,6 +779,13 @@ $("#saveSettings").onclick = async () => {
     toast("Gespeichert ✓");
   }
   localStorage.setItem("noir_sys", $("#sysInput").value.trim());
+  localStorage.setItem("noir_autoread", $("#settAutoRead").checked ? "true" : "false");
+  localStorage.setItem("noir_web_default", $("#settWebOn").checked ? "true" : "false");
+  localStorage.setItem("noir_agent_default", $("#settAgentOn").checked ? "true" : "false");
+  autoRead = $("#settAutoRead").checked;
+  readBtn.classList.toggle("on", autoRead);
+  if ($("#settWebOn").checked && !webOn) { webOn = true; webBtn.classList.add("on"); }
+  if ($("#settAgentOn").checked && !agentOn) { agentOn = true; agentBtn.classList.add("on"); webOn = false; webBtn.classList.remove("on"); }
   closeSettings(); loadModels();
 };
 
@@ -794,11 +807,15 @@ document.addEventListener("keydown", e => {
 /* Initialize only after the server-approved access session exists. */
 function initNoir() {
   window.addEventListener("noir:splashDone", () => inputEl.focus(), { once: true });
-  setTimeout(() => { const s = document.getElementById("splash"); if (s) s.remove(); }, 8000);
+  setTimeout(() => { const s = document.getElementById("splash"); if (s) s.style.display = "none"; }, 8000);
   inputEl.value = localStorage.getItem("noir_draft") || ""; autosize();
+  autoRead = localStorage.getItem("noir_autoread") === "true";
+  readBtn.classList.toggle("on", autoRead);
+  if (localStorage.getItem("noir_web_default") === "true") { webOn = true; webBtn.classList.add("on"); statusLine.textContent = "Web-Recherche aktiviert"; }
+  if (localStorage.getItem("noir_agent_default") === "true") { agentOn = true; agentBtn.classList.add("on"); webOn = false; webBtn.classList.remove("on"); statusLine.textContent = "Agentenmodus aktiviert"; }
   loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));
   renderConvs();
-  if (window.innerWidth <= 700) closeSidebar();
+  if (window.innerWidth <= 1180) closeSidebar();
 }
 if (window.noirAccessGranted) initNoir();
 else window.addEventListener("noir:accessGranted", initNoir, { once: true });

@@ -19,12 +19,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 button { font-family: inherit; }
 .hidden { display: none !important; }
 .mobile-only { display: none; }
+@media (max-width: 1180px) { .mobile-only { display: flex; } }
 
 #app { display: flex; height: 100vh; }
 
 /* ================= sidebar ================= */
 .sidebar-backdrop { display: none; }
-@media (max-width: 700px) {
+@media (max-width: 1180px) {
   .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 55;
     background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
     transition: opacity .25s ease; }
@@ -33,7 +34,7 @@ button { font-family: inherit; }
 #sidebar { width: 244px; min-width: 244px; background: var(--bg-side);
   display: flex; flex-direction: column; padding: 14px 12px; transition: margin .28s cubic-bezier(.4,0,.2,1); }
 #sidebar.collapsed { margin-left: -245px; transform: none; }
-@media (max-width: 700px) {
+@media (max-width: 1180px) {
   #sidebar.collapsed { margin-left: 0; transform: translateX(-100%); }
   #sidebar:not(.collapsed) { transform: translateX(0); }
 }
@@ -250,7 +251,6 @@ button { font-family: inherit; }
     transition: transform .28s cubic-bezier(.4,0,.2,1), box-shadow .28s ease; }
   #sidebar.collapsed { transform: translateX(-100%); box-shadow: none; }
   #sidebar:not(.collapsed) { box-shadow: 40px 0 90px rgba(0,0,0,.9); }
-  .mobile-only { display: flex; }
   .thread, .hero { padding: 0 14px; }
   #composerWrap { padding: 0 12px 10px; }
 
@@ -311,8 +311,7 @@ button { font-family: inherit; }
 
   /* Access gate */
   #accessGate { padding: 0 16px; }
-  .gate-mark { font-size: 26px; }
-  #accessCode { font-size: 18px; }
+  .gate-mark { font-size: 30px; }
 
   /* Sources mobile */
   .sources { padding: 10px 0; }
@@ -615,15 +614,166 @@ body { background:#090909; }
 #accessGate { position:fixed; z-index:600; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#000; transition:opacity .6s ease, visibility .6s ease; animation:gateIn .8s ease both; }
 #accessGate[aria-hidden="true"] { opacity:0; visibility:hidden; pointer-events:none; }
 @keyframes gateIn { from { opacity:0; } }
-.gate-mark { font-weight:200; font-size:34px; letter-spacing:.5em; margin-right:-.5em; color:#fff; margin-bottom:46px; animation:tracking-in-expand 1.4s cubic-bezier(.215,.61,.355,1) both; }
-#accessGate form { display:flex; align-items:center; gap:12px; border-bottom:1px solid #262626; padding:6px 4px; transition:border-color .2s; animation:fade-slide .8s ease .35s both; }
-#accessGate form:focus-within { border-color:#555; }
-#accessCode { width:min(300px, 70vw); background:none; border:none; outline:none; color:#f2f2f2; text-transform:uppercase; letter-spacing:.35em; font:20px var(--mono); text-align:center; padding:10px 0; }
-#accessCode::placeholder { color:#333; letter-spacing:.2em; }
-#accessGate form button { background:none; border:none; color:#666; font-size:20px; cursor:pointer; transition:color .15s, transform .15s; padding:0 6px; }
-#accessGate form button:hover { color:#fff; transform:translateX(3px); }
-#accessGate form button:disabled { opacity:.4; cursor:wait; }
-.gate-error { min-height:18px; margin-top:18px; color:#777; font:11px var(--mono); letter-spacing:.05em; }
+.gate-mark { font-weight:200; font-size:42px; letter-spacing:.5em; margin-right:-.5em; color:#fff; margin-bottom:12px; animation:tracking-in-expand 1.4s cubic-bezier(.215,.61,.355,1) both; }
+.gate-sub { font-family:var(--mono); font-size:10px; letter-spacing:.3em; color:#555; margin-bottom:42px; animation:fadeSlide .8s ease .5s both; }
+#googleBtnWrap { animation:fadeSlide .8s ease .35s both; }
+#googleBtnWrap div { display:flex; justify-content:center; }
+.gate-error { min-height:18px; margin-top:20px; color:#666; font:11px var(--mono); letter-spacing:.05em; max-width:280px; text-align:center; line-height:1.5; }
 .hero { isolation:isolate; }.hero::before { opacity:.62; background:linear-gradient(90deg,#090909 1%,rgba(9,9,9,.83) 43%,rgba(9,9,9,.62) 100%),url("assets/hero1.jpg") right 45%/min(820px,76vw) auto no-repeat; animation:noirDrift 20s ease-in-out infinite alternate; }.hero::after { content:""; display:block; position:absolute; inset:0; z-index:0; opacity:.22; background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px); background-size:52px 52px; mask-image:radial-gradient(ellipse at 65% 48%,#000,transparent 65%); pointer-events:none; }.hero-rail { position:absolute; top:50%; z-index:1; display:flex; align-items:center; gap:8px; color:#73736f; font:9px var(--mono); letter-spacing:.13em; writing-mode:vertical-rl; transform:translateY(-50%); }.hero-rail i { display:block; width:1px; height:46px; background:#555551; }.hero-rail-left { left:34px; }.hero-rail-right { right:34px; }.hero-rail-right span:last-child { color:#d6d6d1; font-size:14px; line-height:1; }.hero-eyebrow { animation:fade-slide .7s ease .1s both; }.hero-mark { animation:heroIn 1s cubic-bezier(.16,1,.3,1) .04s both; }.hero-sub,.hero #composerWrap,.sugg-row,.hero-hint { animation:fade-slide .8s ease .18s both; }
 @keyframes heroIn { from { opacity:0; transform:translateY(15px); letter-spacing:.7em; } to { opacity:1; transform:translateY(0); } } @keyframes noirDrift { from { background-position:right 45% top 47%; } to { background-position:right 52% top 53%; } }
 @media (max-width:700px) { .access-shell { width:calc(100vw - 42px); }.access-copy { margin:64px 0 38px; }.access-footer { margin-top:60px; }.access-footer span:first-child { display:none; }.hero-rail { display:none; }.hero::before { opacity:.44; animation:none; }.hero::after { background-size:38px 38px; } }
+
+/* ================= iPad PRO OPTIMIZATION ================= */
+/* iPad viewport ranges: 744-1024px (mini), 820-834px (Air/standard), 1024-1032px (Pro) */
+@media (min-width: 701px) and (max-width: 1180px) {
+  /* Prevent ANY layout shift on iPad */
+  html { overflow: hidden; }
+  body { overflow: hidden; -webkit-overflow-scrolling: touch; }
+
+  /* Sidebar: fixed, no push, overlay only */
+  #sidebar {
+    position: fixed; z-index: 60; height: 100dvh;
+    width: 260px; min-width: 260px;
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    will-change: transform;
+  }
+  #sidebar.collapsed { transform: translateX(-100%); }
+  #sidebar:not(.collapsed) { transform: translateX(0); box-shadow: 40px 0 90px rgba(0,0,0,.9); }
+
+  /* Main area: never shifts */
+  #main { width: 100%; min-width: 0; }
+
+  /* Topbar: sticky, no bounce */
+  #topbar {
+    position: sticky; top: 0; z-index: 30;
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    touch-action: manipulation;
+  }
+
+  /* Chat scroll: momentum scrolling, no bounce */
+  #chat {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    scroll-behavior: smooth;
+    touch-action: pan-y;
+  }
+
+  /* Composer: sticky bottom, never hidden by keyboard */
+  #composerWrap {
+    position: sticky; bottom: 0; z-index: 20;
+    padding-bottom: env(safe-area-inset-bottom, 14px);
+    background: rgba(9,9,9,.92);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+  }
+
+  /* Input: 16px minimum to prevent iOS zoom */
+  #input { font-size: 16px !important; min-height: 44px; }
+
+  /* Touch targets: 44px minimum (Apple HIG) */
+  .icon-ghost { width: 44px; height: 44px; }
+  #sendBtn { width: 44px; height: 44px; }
+  #voiceBtn, #readBtn { width: 44px; height: 44px; }
+  .bare-btn { min-width: 44px; min-height: 44px; }
+
+  /* Suggestion cards: 2-column grid */
+  .sugg-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .sugg { height: 90px; }
+
+  /* Thread: proper width for iPad */
+  .thread { max-width: 720px; padding: 0 20px; }
+
+  /* Code blocks: horizontal scroll, no wrap */
+  .code-block pre {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    word-break: normal;
+    white-space: pre;
+  }
+
+  /* Modals: centered, not full width */
+  .modal {
+    width: min(480px, calc(100vw - 48px));
+    max-height: 85dvh;
+    border-radius: 20px;
+  }
+
+  /* Hero: adapt height */
+  .hero { min-height: calc(100dvh - 62px); }
+
+  /* Avatar in welcome: proper size */
+  .welcome-avatar-wrap { width: 100px; height: 100px; }
+  .welcome-avatar { width: 100px; height: 100px; }
+
+  /* Smoother chat switching: fade transition */
+  .thread { animation: chatFadeIn .25s ease; }
+  @keyframes chatFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Scroll-to-top: smooth */
+  #chat.scroll-top { scroll-behavior: smooth; }
+
+  /* No text selection on UI elements */
+  #sidebar, #topbar, #composerWrap { user-select: none; -webkit-user-select: none; }
+
+  /* Prevent pull-to-refresh on iPad */
+  body { overscroll-behavior-y: contain; }
+
+  /* Jump-latest button: properly positioned */
+  .jump-latest { bottom: 120px; right: 24px; }
+
+  /* Command palette on iPad */
+  .command-panel { width: min(520px, calc(100vw - 32px)); }
+
+  /* Sidebar backdrop */
+  .sidebar-backdrop { display: block; }
+}
+
+/* iPad portrait specifically */
+@media (min-width: 701px) and (max-width: 834px) {
+  .thread { max-width: 600px; padding: 0 16px; }
+  .sugg-row { grid-template-columns: 1fr; }
+  .sugg { height: 72px; }
+  .hero-mark { font-size: clamp(36px, 8vw, 52px); }
+}
+
+/* Smooth chat switching — universal */
+.thread { animation: chatFadeIn .22s ease; }
+@keyframes chatFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Better logo */
+.logo {
+  font-weight: 300;
+  letter-spacing: .4em;
+  font-size: 15px;
+  color: #fff;
+  text-transform: uppercase;
+}
+.brand-lockup {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.brand-lockup span {
+  color: #555;
+  font: 9px var(--mono);
+  letter-spacing: .12em;
+  opacity: 0.7;
+}
+
+/* Smooth sidebar toggle */
+#sidebar { transition: transform .28s cubic-bezier(.4,0,.2,1); }
+
+/* Voice status auto-clear animation */
+.voice-status { transition: opacity .3s ease; }
+.voice-status.fading { opacity: 0; }
+
+/* Settings toggles */
+.settings-divider { height: 1px; background: #252525; margin: 18px 0 4px; }
+.settings-toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; cursor: pointer; }
+.settings-toggle span:first-child { font-size: 13px; color: var(--dim); }
+.settings-toggle input { display: none; }
+.toggle-track { width: 38px; height: 22px; border-radius: 11px; background: #2a2a2a; position: relative; transition: .2s; flex-shrink: 0; }
+.toggle-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #666; transition: .2s; }
+.settings-toggle input:checked + .toggle-track { background: #e2d5c4; }
+.settings-toggle input:checked + .toggle-track::after { transform: translateX(16px); background: #1a1714; }
