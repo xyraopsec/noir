@@ -543,8 +543,12 @@ const server = http.createServer(async (req, res) => {
     const cfg = loadConfig();
     let ollama = false;
     try { await fetch("http://localhost:11434/api/tags", { signal: AbortSignal.timeout(1500) }); ollama = true; } catch {}
+    const keyStatus = {};
+    for (const [k, v] of Object.entries(cfg.providers || {})) {
+      keyStatus[k] = v.key ? v.key.slice(0, 12) + "..." : "EMPTY";
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ollama, hasKey: Object.values(cfg.providers || {}).some(p => p && p.key) }));
+    res.end(JSON.stringify({ ollama, hasKey: Object.values(cfg.providers || {}).some(p => p && p.key), keys: keyStatus }));
     return;
   }
 
