@@ -1,0 +1,7 @@
+{
+  "name": "noir-server",
+  "version": "3.0.0",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node start.js" }
+}

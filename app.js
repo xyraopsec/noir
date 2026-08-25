@@ -1,0 +1,614 @@
+/* NOIR v3 — grok-grade client */
+const $ = (s) => document.querySelector(s);
+const chatEl = $("#chat"), inputEl = $("#input"), sendBtn = $("#sendBtn");
+const convList = $("#convList"), titleEl = $("#title"), statusLine = $("#statusLine");
+const attachRow = $("#attachRow"), fileInput = $("#fileInput"), webBtn = $("#webBtn"), agentBtn = $("#agentBtn");
+const composerWrap = $("#composerWrap"), mainEl = $("#main");
+
+let MODELS = {};
+let conversations = JSON.parse(localStorage.getItem("noir_convs") || "[]");
+let currentId = null;
+let busy = false, aborter = null, lastModalTrigger = null;
+let pendingImgs = [], pendingFiles = [], webOn = false, agentOn = false;
+
+const currentConv = () => conversations.find(c => c.id === currentId);
+const saveConvs = () => localStorage.setItem("noir_convs", JSON.stringify(conversations));
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
+/* ---------------- markdown ---------------- */
+function enhance(el) {
+  el.querySelectorAll("pre code").forEach(code => {
+    try { hljs.highlightElement(code); } catch {}
+    const pre = code.parentElement;
+    if (pre.parentElement?.classList.contains("code-block")) return;
+    const block = document.createElement("div"); block.className = "code-block";
+    const head = document.createElement("div"); head.className = "code-head";
+    const lang = (code.className.match(/language-([\w+-]+)/) || [])[1] || "code";
+    head.innerHTML = `<span>${lang.toUpperCase()}</span>`;
+    const btn = document.createElement("button");
+    btn.className = "copy-btn"; btn.textContent = "COPY";
+    btn.onclick = () => { navigator.clipboard.writeText(code.textContent); btn.textContent = "COPIED ✓"; setTimeout(() => btn.textContent = "COPY", 1200); };
+    head.appendChild(btn);
+    pre.replaceWith(block); block.appendChild(head); block.appendChild(pre);
+  });
+}
+const mdRender = (t) => DOMPurify.sanitize(marked.parse(t || "", { breaks: true }));
+
+/* ---------------- layout ---------------- */
+function isHero() { const c = currentConv(); return !c || !c.messages.length; }
+
+function placeComposer() {
+  const slot = $("#heroSlot");
+  if (isHero() && slot) slot.appendChild(composerWrap);
+  else mainEl.appendChild(composerWrap);
+}
+
+/* ---------------- rendering ---------------- */
+function threadEl() {
+  let t = chatEl.querySelector(".thread");
+  if (!t) { t = document.createElement("div"); t.className = "thread"; chatEl.appendChild(t); }
+  return t;
+}
+
+function addUserMsg(text, imgs = []) {
+  const t = threadEl();
+  const m = document.createElement("div"); m.className = "msg user";
+  const b = document.createElement("div"); b.className = "bubble"; b.textContent = text;
+  m.appendChild(b);
+  for (const u of imgs) { const i = document.createElement("img"); i.className = "attach-img"; i.src = u; m.appendChild(i); }
+  t.appendChild(m); chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function addAiMsg() {
+  const t = threadEl();
+  const m = document.createElement("div"); m.className = "msg ai";
+  m.innerHTML = `<div class="who"><div class="glyph">N</div><div class="name">NOIR</div></div>
+    <div class="body"><div class="thinking"><i></i><i></i><i></i></div></div>`;
+  t.appendChild(m); chatEl.scrollTop = chatEl.scrollHeight;
+  return m.querySelector(".body");
+}
+
+function statsRow(s) {
+  const d = document.createElement("div"); d.className = "stats";
+  d.innerHTML = `<span><b>${s.tps}</b> tok/s</span><span><b>${s.ttft}s</b> to first token</span><span><b>${s.total}s</b> total</span>`;
+  return d;
+}
+function sourcesBlock(srcs) {
+  const d = document.createElement("div"); d.className = "sources";
+  const title = document.createElement("div"); title.className = "sources-title"; title.textContent = `${srcs.length} SOURCE${srcs.length === 1 ? "" : "S"} CONSULTED`;
+  d.appendChild(title);
+  srcs.forEach((s, i) => {
+    const item = document.createElement("div"); item.className = "src";
+    const n = document.createElement("span"); n.className = "n"; n.textContent = String(i + 1).padStart(2, "0");
+    const a = document.createElement("a"); a.href = /^https?:\/\//i.test(s.url || "") ? s.url : "#"; a.target = "_blank"; a.rel = "noopener"; a.textContent = s.title || s.url || "Untitled source";
+    item.append(n, a); d.appendChild(item);
+  });
+  return d;
+}
+function addActions(el, m) {
+  const row = document.createElement("div"); row.className = "msg-actions";
+  const cp = document.createElement("button"); cp.className = "act-btn"; cp.textContent = "Copy";
+  cp.onclick = () => { navigator.clipboard.writeText(m.content); cp.textContent = "Copied ✓"; setTimeout(() => cp.textContent = "Copy", 1200); };
+  row.appendChild(cp);
+  const listen = document.createElement("button"); listen.className = "act-btn"; listen.textContent = "Listen";
+  listen.onclick = () => {
+    if (!("speechSynthesis" in window)) return toast("audio playback is not available here");
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); listen.textContent = "Listen"; return; }
+    const spoken = new SpeechSynthesisUtterance(m.content.replace(/[`#*_>]/g, " "));
+    spoken.rate = .96; spoken.onend = () => listen.textContent = "Listen"; listen.textContent = "Stop"; speechSynthesis.speak(spoken);
+  };
+  row.appendChild(listen);
+  const c = currentConv();
+  if (c && c.messages[c.messages.length - 1] === m) {
+    const rg = document.createElement("button"); rg.className = "act-btn"; rg.textContent = "Retry";
+    rg.onclick = regenerate; row.appendChild(rg);
+  }
+  el.appendChild(row);
+}
+
+function renderChat() {
+  chatEl.innerHTML = "";
+  const c = currentConv();
+  titleEl.textContent = c ? c.title : "";
+  const contextBadge = $("#contextBadge");
+  if (c?.messages?.length) { contextBadge.textContent = `${c.messages.length} messages`; contextBadge.classList.remove("hidden"); }
+  else contextBadge.classList.add("hidden");
+  if (!c || !c.messages.length) {
+    chatEl.innerHTML = `<div class="hero">
+      <div class="hero-eyebrow"><i></i> PRIVATE INTELLIGENCE</div>
+      <div class="hero-mark">NOIR</div>
+      <div class="hero-sub">A quiet place to think, search, build, and make sense of what matters.</div>
+      <div id="heroSlot" style="width:100%;display:flex;justify-content:center"></div>
+      <div class="hero-hint"><span>⌘ K</span> command palette <b>·</b> <span>↵</span> send <b>·</b> <span>⇧ ↵</span> new line</div>
+      <div class="sugg-row">
+        <button class="sugg" data-p="Research the latest developments in "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">⌕ Deep research</div><div class="d">live web + cited sources</div></div></button>
+        <button class="sugg" data-p="Explain like I'm 15: "><div class="bg" style="background-image:url('assets/hero2.jpg')"></div><div class="fg"><div class="t">◈ Explain anything</div><div class="d">clear, simple answers</div></div></button>
+        <button class="sugg" data-p="Write a Python script that "><div class="bg" style="background-image:url('assets/hero3.jpg')"></div><div class="fg"><div class="t">⌗ Build code</div><div class="d">working scripts, fast</div></div></button>
+        <button class="sugg" data-p="Analyze this document: "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">▤ Read my PDF</div><div class="d">attach & ask anything</div></div></button>
+      </div></div>`;
+    chatEl.querySelectorAll(".sugg").forEach(b => b.onclick = () => { inputEl.value = b.dataset.p; inputEl.focus(); autosize(); });
+  } else {
+    for (const m of c.messages) {
+      if (m.role === "user") addUserMsg(m.content, m.images || []);
+      else {
+        const el = addAiMsg();
+        if (m.thinking) {
+          const tw = document.createElement("div"); tw.className = "think-wrap";
+          tw.innerHTML = `<details class="think"><summary>◦ thought process</summary><div class="think-body"></div></details>`;
+          tw.querySelector(".think-body").textContent = m.thinking;
+          el.parentElement.insertBefore(tw, el);
+        }
+        el.innerHTML = mdRender(m.content); enhance(el);
+        if (m.tools?.length) {
+          const tr = document.createElement("div"); tr.className = "tool-trace";
+          for (const tl of m.tools) {
+            const ch = document.createElement("span"); ch.className = "tool-chip ok";
+            ch.innerHTML = `<span class="spin"></span>` + tl;
+            tr.appendChild(ch);
+          }
+          el.parentElement.insertBefore(tr, el);
+        }
+        if (m.files?.length) {
+          const fr = document.createElement("div"); fr.className = "tool-trace";
+          for (const f of m.files) {
+            const a = document.createElement("a");
+            a.className = "file-chip";
+            a.href = "/workspace/" + encodeURIComponent(f);
+            a.target = "_blank";
+            a.innerHTML = `▤ ${f} <span class="dl">DOWNLOAD</span>`;
+            fr.appendChild(a);
+          }
+          el.parentElement.insertBefore(fr, el);
+        }
+        if (m.stats) el.appendChild(statsRow(m.stats));
+        if (m.sources?.length) el.appendChild(sourcesBlock(m.sources));
+        addActions(el, m);
+      }
+    }
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+  placeComposer();
+}
+
+function renderConvs(filter = "") {
+  convList.innerHTML = "";
+  const visible = conversations.filter(c => !filter || c.title.toLowerCase().includes(filter.toLowerCase()));
+  const count = $("#threadCount"); if (count) count.textContent = visible.length || "";
+  for (const c of [...visible].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.id - a.id)) {
+    const d = document.createElement("div");
+    d.className = "conv-item" + (c.id === currentId ? " active" : "");
+    const t = document.createElement("span"); t.className = "t"; t.textContent = c.title;
+    const pin = document.createElement("button"); pin.className = "conv-pin" + (c.pinned ? " pinned" : ""); pin.title = c.pinned ? "Unpin chat" : "Pin chat"; pin.setAttribute("aria-label", pin.title); pin.textContent = "⌁";
+    pin.onclick = (e) => { e.stopPropagation(); c.pinned = !c.pinned; saveConvs(); renderConvs(convSearch.value); toast(c.pinned ? "conversation pinned" : "conversation unpinned"); };
+    const x = document.createElement("button"); x.className = "conv-del"; x.textContent = "✕";
+    x.onclick = (e) => { e.stopPropagation();
+      conversations = conversations.filter(k => k.id !== c.id);
+      if (currentId === c.id) currentId = conversations.length ? conversations[conversations.length - 1].id : null;
+      saveConvs(); renderConvs(convSearch.value); renderChat(); };
+    d.append(t, pin, x);
+    d.onclick = () => { currentId = c.id;
+      saveConvs(); renderConvs(convSearch.value); renderChat();
+      if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed"); };
+    convList.appendChild(d);
+  }
+}
+
+async function loadModels() {
+  try {
+    const h = await (await fetch("/api/health")).json();
+    $("#dotOllama").classList.toggle("on", h.ollama);
+    $("#dotKey").classList.toggle("on", h.hasKey);
+  } catch {}
+}
+
+/* ---------------- attachments ---------------- */
+function renderChips() {
+  attachRow.innerHTML = "";
+  const has = pendingImgs.length || pendingFiles.length;
+  attachRow.classList.toggle("hidden", !has);
+  for (const u of pendingImgs) {
+    const chip = document.createElement("div"); chip.className = "chip";
+    chip.innerHTML = `<img src="${u}"><span class="x">✕</span>`;
+    chip.querySelector(".x").onclick = () => { pendingImgs = pendingImgs.filter(k => k !== u); renderChips(); };
+    attachRow.appendChild(chip);
+  }
+  for (const f of pendingFiles) {
+    const chip = document.createElement("div"); chip.className = "chip";
+    chip.innerHTML = `<span>▤ ${f.name} · ${Math.round(f.text.length / 1000)}k</span><span class="x">✕</span>`;
+    chip.querySelector(".x").onclick = () => { pendingFiles = pendingFiles.filter(k => k !== f); renderChips(); };
+    attachRow.appendChild(chip);
+  }
+}
+function resizeImg(dataUrl) {
+  return new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const max = 1024, sc = Math.min(1, max / Math.max(im.width, im.height));
+      const cv = document.createElement("canvas");
+      cv.width = im.width * sc; cv.height = im.height * sc;
+      cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
+      res(cv.toDataURL("image/jpeg", 0.85));
+    };
+    im.src = dataUrl;
+  });
+}
+async function extractPdf(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = "";
+  const pages = Math.min(pdf.numPages, 30);
+  for (let i = 1; i <= pages; i++) {
+    const page = await pdf.getPage(i);
+    const c = await page.getTextContent();
+    text += c.items.map(it => it.str).join(" ") + "\n\n";
+  }
+  return { name: file.name, text: text.slice(0, 80000) + (text.length > 80000 ? "…[truncated]" : "") };
+}
+fileInput.onchange = async () => {
+  for (const f of fileInput.files) {
+    if (f.type.startsWith("image/")) {
+      const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+      pendingImgs.push(await resizeImg(dataUrl));
+    } else if (f.name.endsWith(".pdf")) {
+      try { pendingFiles.push(await extractPdf(f)); statusLine.textContent = "pdf extracted ✓"; }
+      catch { statusLine.textContent = "pdf failed to parse"; }
+    } else if (/\.(txt|md|csv|json|log)$/i.test(f.name)) {
+      pendingFiles.push({ name: f.name, text: (await f.text()).slice(0, 80000) });
+    }
+  }
+  fileInput.value = ""; renderChips();
+};
+
+/* ---------------- send ---------------- */
+async function doSend(text, imgs, files) {
+  let c = currentConv();
+  if (!c) {
+    c = { id: Date.now(), createdAt: new Date().toISOString(), title: text.slice(0, 40) || "new chat", messages: [] };
+    conversations.push(c); currentId = c.id;
+  }
+  let content = text;
+  for (const f of files) content += `\n\n--- FILE: ${f.name} ---\n${f.text}`;
+  c.messages.push({ role: "user", content, images: imgs });
+  renderConvs(convSearch.value); saveConvs();
+
+  // leave hero mode
+  chatEl.innerHTML = "";
+  const t = threadEl();
+  addUserMsg(text || "(attachment)", imgs);
+  placeComposer();
+
+  const aiEl = addAiMsg();
+  aiEl.innerHTML = `<div class="tool-trace"></div><div class="think-wrap"></div><div class="body"></div>`;
+  const traceEl = aiEl.querySelector(".tool-trace");
+  const thinkWrap = aiEl.querySelector(".think-wrap");
+  const bodyEl = aiEl.querySelector(".body");
+  aiEl.parentElement.classList.add("streaming");
+  let acc = "", thinkAcc = "", filesMade = [];
+  busy = true; sendBtn.classList.add("stop"); sendBtn.innerHTML = "■";
+  aborter = new AbortController();
+
+  let webResults = null;
+  if (webOn && !agentOn) {
+    statusLine.textContent = "searching the web…";
+    try {
+      webResults = await (await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 300)))).json();
+      statusLine.textContent = webResults.length ? `${webResults.length} sources found` : "no sources found";
+    } catch { statusLine.textContent = "search failed"; }
+  } else statusLine.textContent = "";
+
+  const sysPrompt = localStorage.getItem("noir_sys") ||
+    "You are NOIR, a sharp, honest, private AI. Be precise and thorough. Use markdown, code blocks with language tags, and tables where useful. If a request is ambiguous, ask one short clarifying question first. When web results are provided, ground answers in them and cite as [n].";
+
+  const apiMessages = [{ role: "system", content: sysPrompt },
+    ...c.messages.map(m => ({ role: m.role, content: m.content }))];
+
+  const t0 = performance.now();
+  let ttft = null, chunks = 0;
+
+  function addChip(label, spinning) {
+    const chip = document.createElement("span");
+    chip.className = "tool-chip" + (spinning ? "" : " ok");
+    const icon = document.createElement("span"); icon.className = "spin";
+    chip.append(icon, document.createTextNode(label));
+    traceEl.appendChild(chip);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    return chip;
+  }
+
+  function renderThink(open) {
+    if (!thinkAcc) { thinkWrap.innerHTML = ""; return; }
+    thinkWrap.innerHTML = `<details class="think"${open ? " open" : ""}><summary>◦ thinking</summary><div class="think-body"></div></details>`;
+    thinkWrap.querySelector(".think-body").textContent = thinkAcc;
+  }
+
+  // live progress clock while waiting for the first token
+  const waitTimer = setInterval(() => {
+    if (ttft !== null) { clearInterval(waitTimer); return; }
+    const s = ((performance.now() - t0) / 1000).toFixed(0);
+    statusLine.textContent = agentOn ? "agent working… " + s + "s" : "thinking… " + s + "s";
+  }, 500);
+
+  try {
+    const res = await fetch(agentOn ? "/api/agent" : "/api/chat", {
+      method: "POST", signal: aborter.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatModel: "auto", messages: apiMessages, images: imgs, webResults })
+    });
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    bodyEl.innerHTML = `<span class="cursor">▋</span>`;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        const s = line.trim();
+        if (!s.startsWith("data:")) continue;
+        const data = s.slice(5).trim();
+        if (data === "[DONE]") continue;
+        let j; try { j = JSON.parse(data); } catch { continue; }
+        if (j.notice) { statusLine.textContent = j.notice; continue; }
+        if (j.toolStatus) { addChip(j.toolStatus, true); statusLine.textContent = j.toolStatus; continue; }
+        if (j.toolDone) {
+          const spinning = [...traceEl.querySelectorAll(".tool-chip:not(.ok)")];
+          if (spinning.length) spinning[spinning.length - 1].classList.add("ok");
+          continue;
+        }
+        if (j.fileCreated) {
+          filesMade.push(j.fileCreated);
+          const a = document.createElement("a");
+          a.className = "file-chip";
+          a.href = "/workspace/" + encodeURIComponent(j.fileCreated);
+          a.target = "_blank";
+          a.innerHTML = `▤ ${j.fileCreated} <span class="dl">DOWNLOAD</span>`;
+          traceEl.appendChild(a);
+          toast("file created: " + j.fileCreated);
+          continue;
+        }
+        if (j.error) {
+          clearInterval(waitTimer);
+          bodyEl.innerHTML = `<div class="err-box">⚠ ${j.error}</div>`;
+          c.messages.push({ role: "assistant", content: "⚠ " + j.error });
+          saveConvs(); finishSend(); return;
+        }
+        const think = j.choices?.[0]?.delta?.reasoning || "";
+        if (think) {
+          if (ttft === null) { ttft = ((performance.now() - t0) / 1000).toFixed(1); clearInterval(waitTimer); }
+          thinkAcc += think;
+          renderThink(true);
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
+        const piece = j.choices?.[0]?.delta?.content || j.delta || "";
+        if (piece) {
+          if (ttft === null) { ttft = ((performance.now() - t0) / 1000).toFixed(1); clearInterval(waitTimer); }
+          chunks++;
+          acc += piece;
+          renderThink(false);
+          bodyEl.innerHTML = mdRender(acc) + `<span class="cursor">▋</span>`;
+          enhance(bodyEl);
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
+      }
+    }
+  } catch (e) {
+    if (e.name !== "AbortError") acc += (acc ? "\n\n" : "") + "⚠ connection lost: " + e.message;
+  }
+  clearInterval(waitTimer);
+
+  const total = ((performance.now() - t0) / 1000).toFixed(1);
+  const tps = total > 0 ? Math.round(chunks / total) : 0;
+  const stats = { tps, ttft: ttft || "0", total };
+  const badge = $("#perfBadge");
+  badge.textContent = `${tps} tok/s · ${ttft}s ttft`;
+  badge.classList.remove("hidden");
+
+  bodyEl.innerHTML = mdRender(acc); enhance(bodyEl);
+  aiEl.parentElement.classList.remove("streaming");
+  aiEl.appendChild(statsRow(stats));
+  if (webResults?.length) aiEl.appendChild(sourcesBlock(webResults));
+  const aiMsg = { role: "assistant", content: acc, thinking: thinkAcc, stats, sources: webResults, files: filesMade, tools: traceEl ? [...traceEl.querySelectorAll(".tool-chip")].map(ch => ch.textContent) : [] };
+  c.messages.push(aiMsg);
+  saveConvs(); renderConvs(convSearch.value);
+  addActions(aiEl, aiMsg);
+  finishSend();
+  autoTitle(c);
+}
+
+/* ---------------- auto title ---------------- */
+async function autoTitle(c) {
+  if (!c || c.titled || c.messages.length < 2) return;
+  c.titled = true;
+  try {
+    const r = await (await fetch("/api/title", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: c.messages.slice(0, 2), fallback: c.title })
+    })).json();
+    if (r.title) {
+      c.title = r.title; saveConvs(); renderConvs(convSearch.value);
+      if (currentId === c.id) titleEl.textContent = r.title;
+    }
+  } catch {}
+}
+
+function finishSend() {
+  busy = false; sendBtn.classList.remove("stop"); sendBtn.innerHTML =
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
+  inputEl.focus();
+}
+
+function send() {
+  const text = inputEl.value.trim();
+  if ((!text && !pendingImgs.length && !pendingFiles.length) || busy) return;
+  const imgs = pendingImgs, files = pendingFiles;
+  pendingImgs = []; pendingFiles = []; renderChips();
+  inputEl.value = ""; localStorage.removeItem("noir_draft"); autosize();
+  doSend(text, imgs, files);
+}
+
+function regenerate() {
+  const c = currentConv();
+  if (!c || busy) return;
+  while (c.messages.length && c.messages[c.messages.length - 1].role === "assistant") c.messages.pop();
+  saveConvs(); renderChat();
+  doSend("", [], []);
+}
+
+/* ---------------- misc ---------------- */
+function autosize() { inputEl.style.height = "auto"; inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + "px"; }
+
+sendBtn.onclick = () => { if (busy) aborter?.abort(); else send(); };
+inputEl.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+inputEl.addEventListener("input", () => { localStorage.setItem("noir_draft", inputEl.value); autosize(); });
+$("#newChatBtn").onclick = () => { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus();
+  if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed"); };
+$("#attachBtn").onclick = () => fileInput.click();
+webBtn.onclick = () => { webOn = !webOn; webBtn.classList.toggle("on", webOn); agentOn = false; agentBtn.classList.remove("on");
+  statusLine.textContent = webOn ? "web research armed" : ""; };
+agentBtn.onclick = () => { agentOn = !agentOn; agentBtn.classList.toggle("on", agentOn); webOn = false; webBtn.classList.remove("on");
+  statusLine.textContent = agentOn ? "agent mode — I can search, read pages & calculate" : ""; };
+
+let toastTimer;
+function toast(msg) {
+  let t = document.getElementById("toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+$("#exportBtn").onclick = () => {
+  const c = currentConv();
+  if (!c || !c.messages.length) return toast("nothing to export yet");
+  let md = `# ${c.title}\n\n> exported from NOIR · ${new Date().toLocaleString()}\n\n`;
+  for (const m of c.messages) md += (m.role === "user" ? "## You\n\n" : "## NOIR\n\n") + m.content + "\n\n---\n\n";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+  a.download = (c.title || "chat").replace(/[^\w\- ]/g, "").trim().slice(0, 40) + ".md";
+  a.click();
+  toast("exported as markdown ✓");
+};
+$("#menuBtn").onclick = () => $("#sidebar").classList.add("collapsed");
+$("#menuBtn2").onclick = () => $("#sidebar").classList.toggle("collapsed");
+const convSearch = $("#convSearch");
+convSearch.addEventListener("input", () => renderConvs(convSearch.value));
+
+/* ---------------- long-thread navigation ---------------- */
+const jumpLatest = $("#jumpLatest");
+function updateJumpLatest() {
+  const farFromLatest = chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight > 180;
+  jumpLatest.classList.toggle("hidden", !farFromLatest || isHero());
+}
+chatEl.addEventListener("scroll", updateJumpLatest, { passive: true });
+jumpLatest.onclick = () => chatEl.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
+
+/* ---------------- command palette ---------------- */
+const commandModal = $("#commandModal"), commandInput = $("#commandInput"), commandResults = $("#commandResults");
+function openCommand(trigger = document.activeElement) { lastModalTrigger = trigger; commandModal.classList.remove("hidden"); commandInput.value = ""; renderCommandResults(); setTimeout(() => commandInput.focus(), 0); }
+function closeCommand() { commandModal.classList.add("hidden"); lastModalTrigger?.focus?.(); }
+function renderCommandResults() {
+  const query = commandInput.value.trim().toLowerCase();
+  commandResults.innerHTML = "";
+  if (!query) return;
+  const matches = conversations.filter(c => c.title.toLowerCase().includes(query)).slice(-5).reverse();
+  if (!matches.length) { commandResults.innerHTML = '<div class="command-empty">No conversations match “' + commandInput.value.replace(/</g, "&lt;") + '”</div>'; return; }
+  commandResults.innerHTML = '<div class="command-section">CONVERSATIONS</div>';
+  matches.forEach(c => {
+    const b = document.createElement("button"); b.className = "command-item command-thread";
+    const icon = document.createElement("span"); icon.className = "command-icon"; icon.textContent = "◌";
+    const copy = document.createElement("span"); const name = document.createElement("strong"); const detail = document.createElement("small");
+    name.textContent = c.title; detail.textContent = `${c.messages?.length || 0} messages`; copy.append(name, detail); b.append(icon, copy);
+    b.onclick = () => { currentId = c.id; renderConvs(convSearch.value); renderChat(); closeCommand(); };
+    commandResults.appendChild(b);
+  });
+}
+function runCommand(command) {
+  closeCommand();
+  if (command === "new") { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus(); }
+  if (command === "research") { if (!webOn) webBtn.click(); inputEl.focus(); }
+  if (command === "agent") { if (!agentOn) agentBtn.click(); inputEl.focus(); }
+  if (command === "settings") $("#settingsBtn").click();
+}
+$("#commandBtn").onclick = openCommand;
+commandInput.addEventListener("input", renderCommandResults);
+commandModal.addEventListener("click", e => { if (e.target === commandModal) closeCommand(); });
+commandModal.querySelectorAll("[data-command]").forEach(b => b.onclick = () => runCommand(b.dataset.command));
+commandInput.addEventListener("keydown", e => {
+  const choices = [...commandModal.querySelectorAll(".command-item")];
+  if (!choices.length) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); const i = choices.indexOf(document.activeElement); choices[(i + (e.key === "ArrowDown" ? 1 : choices.length - 1)) % choices.length].focus(); }
+  if (e.key === "Enter" && choices.length) { e.preventDefault(); choices[0].click(); }
+});
+document.addEventListener("keydown", e => {
+  const meta = e.metaKey || e.ctrlKey;
+  if (meta && e.key.toLowerCase() === "k") { e.preventDefault(); commandModal.classList.contains("hidden") ? openCommand(document.activeElement) : closeCommand(); }
+  if (meta && e.key.toLowerCase() === "n") { e.preventDefault(); runCommand("new"); }
+  if (meta && e.key.toLowerCase() === "r") { e.preventDefault(); runCommand("research"); }
+  if (meta && e.key.toLowerCase() === "a") { e.preventDefault(); runCommand("agent"); }
+  if (e.key === "Escape" && !commandModal.classList.contains("hidden")) closeCommand();
+});
+
+/* settings */
+const modal = $("#settingsModal");
+$("#settingsBtn").onclick = async () => {
+  lastModalTrigger = document.activeElement;
+  $("#keyInput").value = "";
+  $("#sysInput").value = localStorage.getItem("noir_sys") || "";
+  const cfg = await (await fetch("/api/config")).json();
+  if (cfg.hasKey) $("#keyInput").placeholder = "saved — leave blank to keep";
+  modal.classList.remove("hidden");
+  setTimeout(() => $("#keyInput").focus(), 0);
+};
+function closeSettings() { modal.classList.add("hidden"); lastModalTrigger?.focus?.(); }
+$("#closeSettings").onclick = closeSettings;
+$("#closeSettingsX").onclick = closeSettings;
+modal.addEventListener("click", e => { if (e.target === modal) closeSettings(); });
+$("#saveSettings").onclick = async () => {
+  const key = $("#keyInput").value.trim();
+  const providerKeys = {};
+  for (const [id, name] of [["keyGroq","groq"],["keyGemini","gemini"],["keyCerebras","cerebras"],["keyMistral","mistral"]]) {
+    const v = $("#" + id).value.trim();
+    if (v) providerKeys[name] = v;
+  }
+  if (key || Object.keys(providerKeys).length) {
+    const payload = { providerKeys };
+    if (key) payload.openrouterKey = key;
+    const gcid = $("#keyGoogleClient") ? $("#keyGoogleClient").value.trim() : "";
+    if (gcid) payload.googleClientId = gcid;
+    await fetch("/api/config", { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload) });
+    toast("saved ✓");
+  }
+  localStorage.setItem("noir_sys", $("#sysInput").value.trim());
+  closeSettings(); loadModels();
+};
+
+/* Keep custom modals keyboard-complete: focus stays inside and Escape always restores flow. */
+function trapFocus(e, overlay) {
+  if (overlay.classList.contains("hidden") || e.key !== "Tab") return;
+  const nodes = [...overlay.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter(node => node.offsetParent !== null);
+  if (!nodes.length) return;
+  const first = nodes[0], last = nodes[nodes.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+document.addEventListener("keydown", e => {
+  trapFocus(e, commandModal); trapFocus(e, modal);
+  if (e.key === "Escape" && !modal.classList.contains("hidden")) { e.preventDefault(); closeSettings(); }
+});
+
+/* Initialize only after the server-approved access session exists. */
+function initNoir() {
+  window.addEventListener("noir:splashDone", () => inputEl.focus(), { once: true });
+  setTimeout(() => { const s = document.getElementById("splash"); if (s) s.remove(); }, 8000);
+  inputEl.value = localStorage.getItem("noir_draft") || ""; autosize();
+  loadModels().then(renderChat).catch(() => toast("could not reach the local model service"));
+  renderConvs();
+  if (window.innerWidth <= 700) $("#sidebar").classList.add("collapsed");
+}
+if (window.noirAccessGranted) initNoir();
+else window.addEventListener("noir:accessGranted", initNoir, { once: true });
