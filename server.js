@@ -143,9 +143,14 @@ const stripTags = (s) => s.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&")
   .replace(/&#x27;|&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
 async function ddgSearch(q, n = 6) {
-  const headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" };
+  const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
+  const headers = { "User-Agent": ua, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9" };
+  // Try lite endpoint first
   try {
-    const r = await fetch("https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q), { headers });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const r = await fetch("https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q), { headers, signal: controller.signal });
+    clearTimeout(timer);
     if (r.ok) {
       const html = await r.text();
       const out = [];
@@ -161,22 +166,32 @@ async function ddgSearch(q, n = 6) {
       if (out.length) return out.slice(0, n);
     }
   } catch {}
+  // Fallback: html endpoint
   try {
-    const r = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), { headers });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const r = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), { headers, signal: controller.signal });
+    clearTimeout(timer);
     if (r.ok) {
       const html = await r.text();
       const out = [];
       const rx = /<a[^>]*href="([^"]+)"[^>]*class="result__a"[^>]*>([\s\S]*?)<\/a>|<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-      let m;
-      while ((m = rx.exec(html)) && out.length < n) {
-        const raw = m[1] || m[3];
-        const title = m[2] || m[4];
-        const u = raw.match(/uddg=([^&]+)/);
-        const url = u ? decodeURIComponent(u[1].replace(/&amp;/g, "&")) : raw;
-        if (!/^https?:/.test(url)) continue;
-        out.push({ title: stripTags(title), url, snippet: "" });
+      let m; while ((m = rx.exec(html)) !== null) {
+        const url = (m[1] || m[3] || "").trim();
+        const title = stripTags(m[2] || m[4] || "");
+        if (!url || !title) continue;
+        out.push({ title, url, snippet: "" });
       }
-      if (out.length) return out;
+      if (out.length) return out.slice(0, n);
+    }
+  } catch {}
+  // Fallback: Wikipedia API for factual queries
+  try {
+    const lang = /^[\u00C0-\u017F]/.test(q) ? "de" : "en";
+    const r = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(5000) });
+    if (r.ok) {
+      const d = await r.json();
+      return [{ title: d.title || q, url: d.content_urls?.desktop?.page || "#", snippet: d.extract || "" }];
     }
   } catch {}
   return [];
@@ -655,10 +670,15 @@ const server = http.createServer(async (req, res) => {
 
   if (u.pathname === "/api/search") {
     const q = u.searchParams.get("q") || "";
-    if (!q) { res.writeHead(400).end(); return; }
-    const results = await ddgSearch(q);
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(results));
+    if (!q) { res.writeHead(200, { "Content-Type": "application/json" }); res.end("[]"); return; }
+    try {
+      const results = await ddgSearch(q);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(results));
+    } catch (e) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("[]");
+    }
     return;
   }
 
