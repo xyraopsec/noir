@@ -223,9 +223,15 @@ const RETRYABLE = [403, 404, 429, 500, 502, 503, 504];
 
 // models that accept image input
 const VISION_IDS = new Set([
+  // OpenRouter FREE vision models (preferred — no payment required)
+  "nvidia/nemotron-nano-12b-v2-vl:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  // Paid providers (may require payment)
   "qwen/qwen3.6-27b", "qwen/qwen3.8-27b",
   "gemini-3.7-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite",
-  "gemini-3.1-pro-preview", "google/gemma-4-31b-it:free", "gemma-4-31b",
+  "gemini-3.1-pro-preview", "gemma-4-31b",
   "meta/llama-3.2-90b-vision-instruct", "meta/llama-3.2-11b-vision-instruct"
 ]);
 
@@ -245,24 +251,27 @@ function pickAuto(cfg, body, mode) {
     return "gem37";
   }
   if (hasImages) {
-    // Vision: fastest models first (Gemini 2.5 Flash Lite ~5s, Cerebras Gemma 4 ~8s).
-    // Groq Qwen 3.6 27B is too small for accurate OCR — skip it entirely for images.
+    // Vision: FREE OpenRouter models first (no payment required).
+    // Then Gemini direct API, then others.
     if (tier === "fast") {
+      if (has("orvision")) return "orvision";
+      if (has("orgemma4")) return "orgemma4";
       if (has("gem25lite")) return "gem25lite";
-      if (has("cbgemma")) return "cbgemma";
+      if (has("orgemma4mo")) return "orgemma4mo";
       if (has("gem35")) return "gem35";
       if (has("gem37")) return "gem37";
-      if (has("vision")) return "vision";
       if (has("nvvision")) return "nvvision";
-      return "gem25lite";
+      return "orvision";
     }
+    // Default/balanced/smart/deep: best free first
+    if (has("orvision")) return "orvision";
+    if (has("orgemma4")) return "orgemma4";
     if (has("gem25lite")) return "gem25lite";
-    if (has("cbgemma")) return "cbgemma";
+    if (has("orgemma4mo")) return "orgemma4mo";
     if (has("gem37")) return "gem37";
     if (has("gem35")) return "gem35";
-    if (has("vision")) return "vision";
     if (has("nvvision")) return "nvvision";
-    return "gem25lite";
+    return "orvision";
   }
 
   // Text-only: tier-based selection
