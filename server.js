@@ -17,7 +17,31 @@ const MIME = {
   ".svg": "image/svg+xml", ".ico": "image/x-icon", ".woff2": "font/woff2"
 };
 
-const loadConfig = () => JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8").replace(/^\uFEFF/, ""));
+const loadConfig = () => {
+  const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8").replace(/^\uFEFF/, ""));
+  ensureFreeVisionModels(cfg);
+  return cfg;
+};
+
+// Auto-inject free OpenRouter vision models if missing from config
+const FREE_VISION_MODELS = {
+  orvision: { label: "Nemotron 12B VL", sub: "openrouter · free vision", provider: "openrouter", id: "nvidia/nemotron-nano-12b-v2-vl:free" },
+  orgemma4: { label: "Gemma 4 31B", sub: "openrouter · free vision", provider: "openrouter", id: "google/gemma-4-31b-it:free" },
+  orgemma4mo: { label: "Gemma 4 26B MoE", sub: "openrouter · free vision", provider: "openrouter", id: "google/gemma-4-26b-a4b-it:free" },
+  ornano: { label: "Nemotron Omni", sub: "openrouter · free vision+audio", provider: "openrouter", id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free" }
+};
+const ensureFreeVisionModels = (cfg) => {
+  if (!cfg.models) cfg.models = {};
+  for (const [k, v] of Object.entries(FREE_VISION_MODELS)) {
+    if (!cfg.models[k]) cfg.models[k] = v;
+  }
+  // Also ensure free vision models are in fallbacks
+  if (!Array.isArray(cfg.fallbacks)) cfg.fallbacks = [];
+  const freeIds = Object.values(FREE_VISION_MODELS).map(m => "openrouter|" + m.id);
+  for (const fid of freeIds) {
+    if (!cfg.fallbacks.includes(fid)) cfg.fallbacks.splice(4, 0, fid); // after Groq+Gemini
+  }
+};
 const readBody = (req) => new Promise((res, rej) => {
   let d = ""; req.on("data", c => { d += c; if (d.length > 60e6) req.destroy(); });
   req.on("end", () => res(d)); req.on("error", rej);
