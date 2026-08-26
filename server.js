@@ -245,23 +245,24 @@ function pickAuto(cfg, body, mode) {
     return "gem37";
   }
   if (hasImages) {
-    // Vision: Gemini first (best OCR/handwriting recognition).
-    // Groq Qwen 3.6 27B is too small for accurate vision — skip it entirely for images.
+    // Vision: fastest models first (Gemini 2.5 Flash Lite ~5s, Cerebras Gemma 4 ~8s).
+    // Groq Qwen 3.6 27B is too small for accurate OCR — skip it entirely for images.
     if (tier === "fast") {
+      if (has("gem25lite")) return "gem25lite";
+      if (has("cbgemma")) return "cbgemma";
       if (has("gem35")) return "gem35";
       if (has("gem37")) return "gem37";
-      if (has("cbgemma")) return "cbgemma";
-      if (has("groqqwen")) return "groqqwen";
       if (has("vision")) return "vision";
       if (has("nvvision")) return "nvvision";
-      return "gem35";
+      return "gem25lite";
     }
+    if (has("gem25lite")) return "gem25lite";
+    if (has("cbgemma")) return "cbgemma";
     if (has("gem37")) return "gem37";
     if (has("gem35")) return "gem35";
     if (has("vision")) return "vision";
     if (has("nvvision")) return "nvvision";
-    if (has("groqqwen")) return "groqqwen";
-    return "cbgemma";
+    return "gem25lite";
   }
 
   // Text-only: tier-based selection
