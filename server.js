@@ -208,6 +208,7 @@ const RETRYABLE = [403, 404, 429, 500, 502, 503, 504];
 
 // models that accept image input
 const VISION_IDS = new Set([
+  "qwen/qwen3.6-27b", "qwen/qwen3.8-27b",
   "gemini-3.7-flash", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite",
   "gemini-3.1-pro-preview", "google/gemma-4-31b-it:free", "gemma-4-31b",
   "meta/llama-3.2-90b-vision-instruct", "meta/llama-3.2-11b-vision-instruct"
@@ -230,15 +231,17 @@ function pickAuto(cfg, body, mode) {
   }
   if (hasImages) {
     if (tier === "fast") {
-      // Schnell: schnellstes Vision-Modell zuerst
+      // Schnell: Groq Vision zuerst (~300 tok/s!)
+      if (has("groqqwen")) return "groqqwen";
       if (has("gem35")) return "gem35";
       if (has("cbgemma")) return "cbgemma";
       if (has("gem37")) return "gem37";
       if (has("vision")) return "vision";
       if (has("nvvision")) return "nvvision";
-      return "gem35";
+      return "groqqwen";
     }
     if (has("gem37")) return "gem37";
+    if (has("groqqwen")) return "groqqwen";
     if (has("vision")) return "vision";
     if (has("nvvision")) return "nvvision";
     if (has("gem35")) return "gem35";
