@@ -872,7 +872,6 @@ $("#settingsBtn").onclick = async () => {
   $("#settWebOn").checked = localStorage.getItem("noir_web_default") === "true";
   $("#fontSizeRange").value = fontSize;
   $("#fontSizeVal").textContent = fontSize;
-  $("#settAgentOn").checked = localStorage.getItem("noir_agent_default") === "true";
   const cfg = await (await fetch("/api/config")).json();
   if (cfg.hasKey) $("#keyInput").placeholder = "Gespeichert — leer lassen zum Behalten";
   modal.classList.remove("hidden");
@@ -904,10 +903,8 @@ $("#saveSettings").onclick = async () => {
   localStorage.setItem("noir_fontsize", $("#fontSizeRange").value);
   fontSize = parseInt($("#fontSizeRange").value, 10);
   applyFontSize();
-  localStorage.setItem("noir_agent_default", $("#settAgentOn").checked ? "true" : "false");
   autoRead = $("#settAutoRead").checked;
   if ($("#settWebOn").checked && !webOn) { webOn = true; webBtn.classList.add("on"); }
-  if ($("#settAgentOn") && $("#settAgentOn").checked) { webOn = true; webBtn.classList.add("on"); }
   closeSettings(); loadModels();
 };
 
@@ -933,7 +930,6 @@ function initNoir() {
   inputEl.value = localStorage.getItem("noir_draft") || ""; autosize();
   autoRead = localStorage.getItem("noir_autoread") === "true";
   if (localStorage.getItem("noir_web_default") === "true") { webOn = true; webBtn.classList.add("on"); statusLine.textContent = "Web-Recherche aktiviert"; }
-  if (localStorage.getItem("noir_agent_default") === "true") { webOn = true; webBtn.classList.add("on"); statusLine.textContent = "Web-Recherche aktiviert"; }
   loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));
   renderConvs();
   applyProfile();
