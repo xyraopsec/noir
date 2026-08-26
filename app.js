@@ -105,10 +105,9 @@ function addUserMsg(text, imgs = [], editable = false) {
 function addAiMsg() {
   const t = threadEl();
   const m = document.createElement("div"); m.className = "msg ai";
-  m.innerHTML = `<div class="who"><div class="glyph">N</div><div class="name">NOIR</div></div>
-    <div class="body"><div class="thinking"><i></i><i></i><i></i></div></div>`;
+  m.innerHTML = `<div class="who"><div class="glyph">N</div><div class="name">NOIR</div></div><div class="ai-content"></div>`;
   t.appendChild(m); chatEl.scrollTop = chatEl.scrollHeight;
-  return m.querySelector(".body");
+  return m.querySelector(".ai-content");
 }
 
 function statsRow(s) {
@@ -221,7 +220,7 @@ function renderChat() {
         }
         if (m.model) {
           const mb = document.createElement("div"); mb.className = "model-badge";
-          const tierIcon = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : "◉";
+          const tierIcon = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : modelTier === "deep" ? "◆" : "◉";
           mb.innerHTML = `<span class="model-dot"></span>${tierIcon} ${m.model.label}${m.model.provider ? " · " + m.model.provider : ""}`;
           el.appendChild(mb);
         }
