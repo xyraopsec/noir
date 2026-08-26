@@ -273,6 +273,16 @@ function pickAuto(cfg, body, mode) {
   return "gem37";
 }
 
+function buildBody(cand, messages, stream) {
+  const body = { model: cand.id, messages, stream };
+  if (cand.provider === "groq") {
+    if (/qwen\/qwen3\.6/.test(cand.id)) body.reasoning_effort = "none";
+    else if (/qwen\/qwen3\.8/.test(cand.id)) body.reasoning_effort = "low";
+    else if (/openai\/gpt-oss/.test(cand.id)) body.reasoning_effort = "low";
+  }
+  return body;
+}
+
 /* ---------------- chat (streaming) ---------------- */
 async function handleChat(req, res) {
   const cfg = loadConfig();
@@ -323,7 +333,7 @@ async function handleChat(req, res) {
     try {
       const attempt = await fetch(up.url, {
         method: "POST", headers: up.headers,
-        body: JSON.stringify({ model: cand.id, messages, stream: true, reasoning_effort: "low" })
+        body: JSON.stringify(buildBody(cand, messages, true))
       });
       if (attempt.ok) { ur = attempt; usedId = cand.id; break; }
       const t = await attempt.text().catch(() => "");
@@ -428,7 +438,7 @@ async function callModel(cfg, modelId, messages) {
     const up = upstreamFor(cfg, cand);
     if (!up) continue;
     try {
-      const r = await fetch(up.url, { method: "POST", headers: up.headers, body: JSON.stringify({ model: cand.id, messages, stream: false, reasoning_effort: "low" }) });
+      const r = await fetch(up.url, { method: "POST", headers: up.headers, body: JSON.stringify(buildBody(cand, messages, false)) });
       if (r.ok) { const j = await r.json(); return j.choices[0].message.content || ""; }
       lastErr = "model " + r.status;
       if (!RETRYABLE.includes(r.status)) break;
