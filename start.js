@@ -1,4 +1,5 @@
 // NOIR cloud start — generates config.json from env vars, then boots server
+require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 

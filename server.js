@@ -229,6 +229,15 @@ function pickAuto(cfg, body, mode) {
     return "gem37";
   }
   if (hasImages) {
+    if (tier === "fast") {
+      // Schnell: schnellstes Vision-Modell zuerst
+      if (has("gem35")) return "gem35";
+      if (has("cbgemma")) return "cbgemma";
+      if (has("gem37")) return "gem37";
+      if (has("vision")) return "vision";
+      if (has("nvvision")) return "nvvision";
+      return "gem35";
+    }
     if (has("gem37")) return "gem37";
     if (has("vision")) return "vision";
     if (has("nvvision")) return "nvvision";

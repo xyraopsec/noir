@@ -1,3 +1,6 @@
 .env
 config.json
 workspace/
+node_modules/
+package-lock.json
+start-noir.ps1
