@@ -142,13 +142,13 @@ const stripTags = (s) => s.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&")
   .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
   .replace(/&#x27;|&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
-async function ddgSearch(q, n = 6) {
+async function ddgSearch(q, n = 8) {
   const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
-  const headers = { "User-Agent": ua, "Accept": "text/html", "Accept-Language": "en-US,en;q=0.9" };
+  const headers = { "User-Agent": ua, "Accept": "text/html", "Accept-Language": "de-DE,de;q=0.9,en-US,en;q=0.8" };
   // Try lite endpoint first
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 15000);
     const r = await fetch("https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent(q), { headers, signal: controller.signal });
     clearTimeout(timer);
     if (r.ok) {
@@ -169,7 +169,7 @@ async function ddgSearch(q, n = 6) {
   // Fallback: html endpoint
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 15000);
     const r = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q), { headers, signal: controller.signal });
     clearTimeout(timer);
     if (r.ok) {
@@ -245,21 +245,22 @@ function pickAuto(cfg, body, mode) {
     return "gem37";
   }
   if (hasImages) {
+    // Vision: Gemini first (best OCR/handwriting recognition).
+    // Groq Qwen 3.6 27B is too small for accurate vision — skip it entirely for images.
     if (tier === "fast") {
-      // Schnell: Groq Vision zuerst (~300 tok/s!)
-      if (has("groqqwen")) return "groqqwen";
       if (has("gem35")) return "gem35";
-      if (has("cbgemma")) return "cbgemma";
       if (has("gem37")) return "gem37";
+      if (has("cbgemma")) return "cbgemma";
+      if (has("groqqwen")) return "groqqwen";
       if (has("vision")) return "vision";
       if (has("nvvision")) return "nvvision";
-      return "groqqwen";
+      return "gem35";
     }
     if (has("gem37")) return "gem37";
-    if (has("groqqwen")) return "groqqwen";
+    if (has("gem35")) return "gem35";
     if (has("vision")) return "vision";
     if (has("nvvision")) return "nvvision";
-    if (has("gem35")) return "gem35";
+    if (has("groqqwen")) return "groqqwen";
     return "cbgemma";
   }
 
@@ -335,11 +336,11 @@ async function handleChat(req, res) {
   }
 
   if (Array.isArray(body.webResults) && body.webResults.length) {
-    const block = "WEB SEARCH RESULTS (fresh) - cite them with [n] where used:\n" +
+    const block = "LIVE WEB SEARCH RESULTS — DU MUST USE THESE AS YOUR PRIMARY SOURCE. Cite with [n].\n" +
       body.webResults.map((r, i) => `[${i + 1}] ${r.title}\n${r.snippet}\nURL: ${r.url}`).join("\n\n");
-    messages = [{ role: "system", content: "You have live web access. Use the following search results as ground truth for current facts." },
+    messages = [{ role: "system", content: "You have live web search results below. THESE ARE YOUR PRIMARY FACTS. Do NOT use your own knowledge when these results exist. Always cite sources with [n]. If results conflict, mention both. If a date/number/price appears in the results, use THAT value — never guess." },
       ...messages.slice(0, -1),
-      { role: "user", content: messages[messages.length - 1].content + "\n\n" + block }];
+      { role: "user", content: messages[messages.length - 1].content + "\n\n---\n" + block }];
   }
 
   if (m.provider !== "ollama" && !upstreamFor(cfg, m)) {

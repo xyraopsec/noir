@@ -353,16 +353,30 @@ async function doSend(text, imgs, files) {
   const bodyEl = aiEl.querySelector(".body");
   aiEl.parentElement.classList.add("streaming");
   let acc = "", thinkAcc = "", filesMade = [], modelInfo = null;
+  let renderScheduled = false;
+  function scheduleRender() {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => {
+      renderScheduled = false;
+      bodyEl.innerHTML = mdRender(streamSafe(acc)) + `<span class="cursor">▋</span>`;
+      enhance(bodyEl);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    });
+  }
   busy = true; sendBtn.classList.add("stop"); sendBtn.innerHTML = "■";
   aborter = new AbortController();
 
   let webResults = null;
-  const needsWeb = /\b(wann|wo|wer|wie|aktuell|neueste|heute|gestern|2025|2026|2027|preis|kosten|wetter|news|rezept|film|serie|spiel|sport|ergebnis|kurs|wechselkurs|promi|gerücht)\b/i.test(text)
-    || text.includes("?") && text.length > 20;
+  const needsWeb = /\b(wann|wo|wer|wie|aktuell|neueste|heute|gestern|morgen|2025|2026|2027|preis|kosten|wetter|news|rezept|film|serie|spiel|sport|ergebnis|kurs|wechselkurs|promi|gerücht|datum|zeit|termin|event|konzert|flug|bahn|strasse|weg)\b/i.test(text)
+    || /\?/.test(text) && text.length > 15;
   if (needsWeb) {
     statusLine.textContent = "🔍 Durchsuche das Web…";
     try {
-      const searchRes = await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 300)));
+      const searchController = new AbortController();
+      const searchTimer = setTimeout(() => searchController.abort(), 20000);
+      const searchRes = await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 500)), { signal: searchController.signal });
+      clearTimeout(searchTimer);
       const searchJson = await searchRes.json();
       webResults = Array.isArray(searchJson) ? searchJson : [];
       statusLine.textContent = webResults.length ? `✓ ${webResults.length} Quellen gefunden` : "";
@@ -370,7 +384,7 @@ async function doSend(text, imgs, files) {
   }
 
   const sysPrompt = localStorage.getItem("noir_sys") ||
-    "Du bist NOIR, ein Assistent fuer Schueler. Es ist 2026.\n\nSCHREIBSTIL:\nSchreib so, wie ein normaler Mensch in einem Chat schreiben wuerde. Natuerlich, direkt und locker, aber nicht kuenstlich jugendlich. Verwende einfache Woerter, wenn sie ausreichen. Keine unnötig komplizierten Formulierungen, keine aufgeblasene Sprache. Variiere die Satzlaenge. Manche Saetze duerfen sehr kurz sein. Andere duerfen etwas laenger sein. Vermeide, dass mehrere Saetze gleich aufgebaut sind. Beginne nicht staendig mit \"Das\", \"Dies\", \"Es ist\" oder \"Dabei\". Verwende natuerliche Uebergaenge oder gar keine Uebergaenge, wenn einer nicht noetig ist. Wiederhole die Frage des Users nicht einfach am Anfang. Komm direkt zum Punkt. Keine kuenstlichen Einleitungen wie \"Gerne helfe ich dir dabei\", \"Natuerlich!\", \"Das ist eine interessante Frage\" oder \"Zusammenfassend\". Keine uebertrieben professionellen Formulierungen. Keine Werbesprache und kein kuenstlicher Enthusiasmus. Keine erfundenen persoenlichen Erfahrungen, Meinungen oder Erlebnisse. Verwende Umgangssprache nur dort, wo sie natuerlich passt. Nicht zwanghaft Slang einbauen. Kleine menschliche Unvollkommenheiten im Rhythmus sind okay. Der Text muss nicht wie ein perfekt bearbeiteter Aufsatz klingen. Schreibe nicht jede Antwort nach demselben Muster. Wenn eine direkte Antwort reicht, gib nur die direkte Antwort. Wenn eine Erklaerung noetig ist, erklaere sie so, wie du sie einem Freund erklaeren wuerdest. Keine Floskeln und kein Fuelltext.\n\nWICHTIG:\nVersuche nicht, einen KI-Detektor auszutricksen oder gezielt Erkennungssysteme zu umgehen. Dein Ziel ist natuerliche, glaubwuerdige und gut lesbare Sprache. Behalte Fakten und Bedeutung bei. Erfinde niemals Quellen oder Informationen. Wenn du etwas nicht weisst, sag es kurz und ehrlich. Schreibe nicht absichtlich Fehler ein, nur damit der Text menschlicher wirkt.\n\nSPRACHE:\nStandardmaessig Deutsch. Kein Eszett. Schreibe immer \"ss\" statt \"ß\". Kein Em-Dash. Verwende stattdessen Kommas oder Punkte. Nutze Schweizer Schreibweise, wenn passend. Der Nutzer darf aber auch Englisch oder eine andere Sprache verwenden. Antworte dann in derselben Sprache.\n\nANTWORTLAENGE:\nNormalerweise kurz und direkt. 3-6 Saetze sind ein guter Standard. Bei einfachen Fragen reichen 1-3 Saetze. Wenn die Aufgabe mehr Erklaerung braucht, darf die Antwort deutlich laenger werden. Opfere niemals wichtige Informationen nur wegen einer festen Satzanzahl.\n\nFORMAT:\nVerwende Markdown, wenn es die Antwort wirklich besser lesbar macht. Nutze Listen fuer mehrere Punkte. Nutze Code-Bloecke mit Sprach-Tags fuer Code. Nutze Tabellen nur, wenn sie einen echten Vorteil bringen. Vermeide unnoetige Ueberschriften. Quellen aus dem Web direkt im Text mit [1], [2] usw. markieren. Unter der Antwort eine Quellenliste mit Titel und URL ausgeben, wenn Webquellen verwendet wurden.\n\nAKTUALITAET:\nBei aktuellen Themen wie Nachrichten, Kursen, Wetter, Ereignissen, Preisen, Releases oder anderen zeitabhaengigen Informationen IMMER eine Websuche verwenden.\n\nQUALITAETSCHECK:\nBevor du antwortest, pruefe still: Klingt die Antwort wie normale menschliche Sprache? Sind Satzlaenge und Satzaufbau nicht staendig gleich? Gibt es unnoetige Floskeln oder Wiederholungen? Ist die Antwort so kurz wie moeglich, aber so lang wie noetig? Wuerde jemand diese Antwort tatsaechlich so schreiben oder sagen? Anstatt \"Grundsätzlich gilt: blabla\" sagst du \"Grundsätzlich gilt bla bla\" oder \"grundsätzlich gilt, bla bla\". Kommas nur setzen wo noetig. Wenn etwas kuenstlich oder ueberformuliert klingt, formuliere es einfacher.";
+    "Du bist NOIR, ein Assistent fuer Schueler. Es ist 2026.\n\nSCHREIBSTIL:\nSchreib so, wie ein normaler Mensch in einem Chat schreiben wuerde. Natuerlich, direkt und locker, aber nicht kuenstlich jugendlich. Verwende einfache Woerter, wenn sie ausreichen. Keine unnötig komplizierten Formulierungen, keine aufgeblasene Sprache. Variiere die Satzlaenge. Manche Saetze duerfen sehr kurz sein. Andere duerfen etwas laenger sein. Vermeide, dass mehrere Saetze gleich aufgebaut sind. Beginne nicht staendig mit \"Das\", \"Dies\", \"Es ist\" oder \"Dabei\". Verwende natuerliche Uebergaenge oder gar keine Uebergaenge, wenn einer nicht noetig ist. Wiederhole die Frage des Users nicht einfach am Anfang. Komm direkt zum Punkt. Keine kuenstlichen Einleitungen wie \"Gerne helfe ich dir dabei\", \"Natuerlich!\", \"Das ist eine interessante Frage\" oder \"Zusammenfassend\". Keine uebertrieben professionellen Formulierungen. Keine Werbesprache und kein kuenstlicher Enthusiasmus. Keine erfundenen persoenlichen Erfahrungen, Meinungen oder Erlebnisse. Verwende Umgangssprache nur dort, wo sie natuerlich passt. Nicht zwanghaft Slang einbauen. Kleine menschliche Unvollkommenheiten im Rhythmus sind okay. Der Text muss nicht wie ein perfekt bearbeiteter Aufsatz klingen. Schreibe nicht jede Antwort nach demselben Muster. Wenn eine direkte Antwort reicht, gib nur die direkte Antwort. Wenn eine Erklaerung noetig ist, erklaere sie so, wie du sie einem Freund erklaeren wuerdest. Keine Floskeln und kein Fuelltext.\n\nFAKTISCHE GENAUIGkeit (HÖCHSTE PRIORITÄT):\nWenn dem System Web-Suchergebnisse mitgegeben wurden, basiere deine Antwort AUSSCHLIESSLICH auf diesen Quellen. Verwende NIEMALS dein eigenes Wissen, wenn Suchergebnisse vorhanden sind. Suche、Ergebnisse sind aktuell, dein Trainingsdaten sind veraltet. Nenne immer die konkrete Quelle mit [n] fuer jede Fact. Wenn die Suchergebnisse widersprüchlich sind, nenne beide Seiten. Wenn du dir bei einer Zahl, einem Datum oder einem Fakt NICHT SICHER bist, sage \"Laut Quelle [n]...\" oder \"Ich bin mir nicht sicher, aber laut...\". Erfinde NIEMALS Daten, Zahlen, Preise, Termine oder Namen. Selbst wenn du glaubst, die Antwort zu kennen: Wenn Web-Suchergebnisse vorhanden sind, verlasse dich darauf. Bei Unsicherheit: Sag kurz \"Dazu habe ich keine zuverlässige Quelle\".\n\nWICHTIG:\nErfinde niemals Quellen oder Informationen. Wenn du etwas nicht weisst, sag es kurz und ehrlich. Verweigere keine Hilfe, aber sei ehrlich bei Unsicherheit.\n\nSPRACHE:\nStandardmaessig Deutsch. Kein Eszett. Schreibe immer \"ss\" statt \"ß\". Kein Em-Dash. Verwende stattdessen Kommas oder Punkte. Nutze Schweizer Schreibweise, wenn passend. Der Nutzer darf aber auch Englisch oder eine andere Sprache verwenden. Antworte dann in derselben Sprache.\n\nANTWORTLAENGE:\nNormalerweise kurz und direkt. 3-6 Saetze sind ein guter Standard. Bei einfachen Fragen reichen 1-3 Saetze. Wenn die Aufgabe mehr Erklaerung braucht, darf die Antwort deutlich laenger werden. Opfere niemals wichtige Informationen nur wegen einer festen Satzanzahl.\n\nFORMAT:\nVerwende Markdown, wenn es die Antwort wirklich besser lesbar macht. Nutze Listen fuer mehrere Punkte. Nutze Code-Bloecke mit Sprach-Tags fuer Code. Nutze Tabellen nur, wenn sie einen echten Vorteil bringen. Vermeide unnoetige Ueberschriften. Quellen aus dem Web direkt im Text mit [1], [2] usw. markieren. Unter der Antwort eine Quellenliste mit Titel und URL ausgeben, wenn Webquellen verwendet wurden.\n\nAKTUALITAET:\nBei aktuellen Themen wie Nachrichten, Kursen, Wetter, Ereignissen, Preisen, Releases oder anderen zeitabhaengigen Informationen IMMER eine Websuche verwenden. NIEMALS Termine, Daten oder Zahlen aus dem Gedächtnis nennen, wenn Suchergebnisse vorhanden sind.\n\nQUALITAETSCHECK:\nBevor du antwortest, pruefe still: Klingt die Antwort wie normale menschliche Sprache? Sind Satzlaenge und Satzaufbau nicht staendig gleich? Gibt es unnoetige Floskeln oder Wiederholungen? Ist die Antwort so kurz wie moeglich, aber so lang wie noetig? Wuerde jemand diese Antwort tatsaechlich so schreiben oder sagen? Anstatt \"Grundsätzlich gilt: blabla\" sagst du \"Grundsätzlich gilt bla bla\" oder \"grundsätzlich gilt, bla bla\". Kommas nur setzen wo noetig. Wenn etwas kuenstlich oder ueberformuliert klingt, formuliere es einfacher.";
 
   const apiMessages = [{ role: "system", content: sysPrompt },
     ...c.messages.map(m => ({ role: m.role, content: m.content }))];
@@ -414,7 +428,9 @@ async function doSend(text, imgs, files) {
 
   // Streaming with auto-retry on connection drop
   const MAX_STREAM_RETRY = 2;
+  let retryNeeded = false;
   for (let attempt = 0; attempt <= MAX_STREAM_RETRY; attempt++) {
+    retryNeeded = false;
     try {
       const res = await fetch("/api/chat", {
         method: "POST", signal: aborter.signal,
@@ -438,7 +454,7 @@ async function doSend(text, imgs, files) {
           const data = s.slice(5).trim();
           if (data === "[DONE]") continue;
           let j; try { j = JSON.parse(data); } catch { continue; }
-          if (j.notice) { setStatus(j.notice); if (j.modelInfo) modelInfo = j.modelInfo; continue; }
+          if (j.notice) { setStatus(j.notice); if (j.modelInfo) { modelInfo = j.modelInfo; if (!aiEl.querySelector(".model-badge")) { const mb = document.createElement("div"); mb.className = "model-badge"; const tierIcon = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : modelTier === "deep" ? "◆" : "◉"; mb.innerHTML = `<span class="model-dot"></span>${tierIcon} ${modelInfo.label}${modelInfo.provider ? " · " + modelInfo.provider : ""}`; aiEl.appendChild(mb); } } continue; }
           if (j.toolStatus) { addChip(j.toolStatus, true); setStatus("🔧 " + j.toolStatus); continue; }
           if (j.toolDone) {
             const spinning = [...traceEl.querySelectorAll(".tool-chip:not(.ok)")];
@@ -460,27 +476,31 @@ async function doSend(text, imgs, files) {
           if (j.error) {
             clearInterval(waitTimer);
             const raw = typeof j.error === "string" ? j.error : JSON.stringify(j.error);
-            // Tool-use errors: show friendly fallback instead of raw JSON
-            if (raw.includes("tool_use_failed") || raw.includes("Tool choice is none")) {
+            // Tool-use errors: retry without webResults (only if no content yet)
+            if ((raw.includes("tool_use_failed") || raw.includes("Tool choice is none")) && !acc) {
               setStatus("🔄 Modell-Fehler — versuche ohne Tools…");
-              // retry without webResults
               webResults = null;
-              continue;
+              retryNeeded = true;
+              break;
             }
             bodyEl.innerHTML = `<div class="err-box"><span>⚠ ${raw}</span><button class="retry-btn" onclick="retryLast()">Erneut versuchen</button></div>`;
-            c.messages.push({ role: "assistant", content: "⚠ " + raw });
             saveConvs(); finishSend(); return;
           }
           if (j.notice && j.notice.includes("Wechsel zu")) {
             toast("🔄 " + j.notice);
             modelInfo = j.modelInfo || { label: j.notice.replace("Wechsel zu ", "") };
+            if (!aiEl.querySelector(".model-badge")) {
+              const mb = document.createElement("div"); mb.className = "model-badge";
+              const tierIcon = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : modelTier === "deep" ? "◆" : "◉";
+              mb.innerHTML = `<span class="model-dot"></span>${tierIcon} ${modelInfo.label}${modelInfo.provider ? " · " + modelInfo.provider : ""}`;
+              aiEl.appendChild(mb);
+            }
           }
           const think = j.choices?.[0]?.delta?.reasoning || "";
           if (think) {
             if (ttft === null) { ttft = ((performance.now() - t0) / 1000).toFixed(1); clearInterval(waitTimer); }
             thinkAcc += think;
             renderThink(true);
-            chatEl.scrollTop = chatEl.scrollHeight;
           }
           const piece = j.choices?.[0]?.delta?.content || j.delta || "";
           if (piece) {
@@ -488,11 +508,13 @@ async function doSend(text, imgs, files) {
             chunks++;
             acc += piece;
             renderThink(false);
-            bodyEl.innerHTML = mdRender(streamSafe(acc)) + `<span class="cursor">▋</span>`;
-            enhance(bodyEl);
-            chatEl.scrollTop = chatEl.scrollHeight;
+            scheduleRender();
           }
         }
+      }
+      if (retryNeeded) {
+        await new Promise(r => setTimeout(r, 1500));
+        continue; // retry outer loop without webResults
       }
       break; // success — exit retry loop
     } catch (e) {

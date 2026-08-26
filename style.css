@@ -677,7 +677,6 @@ body { background:#090909; }
   #chat {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    scroll-behavior: smooth;
     touch-action: pan-y;
   }
 
@@ -726,8 +725,8 @@ body { background:#090909; }
   .thread { animation: chatFadeIn .25s ease; }
   @keyframes chatFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* Scroll-to-top: smooth */
-  #chat.scroll-top { scroll-behavior: smooth; }
+  /* Scroll-to-top: instant */
+  #chat.scroll-top { scroll-behavior: auto; }
 
   /* No text selection on UI elements */
   #sidebar, #topbar, #composerWrap { user-select: none; -webkit-user-select: none; }
