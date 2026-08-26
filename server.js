@@ -297,7 +297,7 @@ function pickAuto(cfg, body, mode) {
 }
 
 function buildBody(cand, messages, stream) {
-  const body = { model: cand.id, messages, stream };
+  const body = { model: cand.id, messages, stream, tools: [], tool_choice: "none" };
   if (cand.provider === "groq") {
     if (/qwen\/qwen3\.6/.test(cand.id)) body.reasoning_effort = "none";
     else if (/qwen\/qwen3\.8/.test(cand.id)) body.reasoning_effort = "low";

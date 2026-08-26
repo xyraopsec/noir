@@ -347,7 +347,8 @@ async function doSend(text, imgs, files) {
   placeComposer();
 
   const aiEl = addAiMsg();
-  aiEl.innerHTML = `<div class="tool-trace"></div><div class="think-wrap"></div><div class="body"></div>`;
+  aiEl.innerHTML = `<div class="ai-status-line"></div><div class="tool-trace"></div><div class="think-wrap"></div><div class="body"></div>`;
+  const statusLine2 = aiEl.querySelector(".ai-status-line");
   const traceEl = aiEl.querySelector(".tool-trace");
   const thinkWrap = aiEl.querySelector(".think-wrap");
   const bodyEl = aiEl.querySelector(".body");
@@ -357,13 +358,17 @@ async function doSend(text, imgs, files) {
   aborter = new AbortController();
 
   let webResults = null;
-  statusLine.textContent = "🔍 Durchsuche das Web…";
-  try {
-    const searchRes = await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 300)));
-    const searchJson = await searchRes.json();
-    webResults = Array.isArray(searchJson) ? searchJson : [];
-    statusLine.textContent = webResults.length ? `✓ ${webResults.length} Quellen gefunden` : "Keine Quellen gefunden";
-  } catch { statusLine.textContent = "Suche fehlgeschlagen"; webResults = []; }
+  const needsWeb = /\b(wann|wo|wer|wie|aktuell|neueste|heute|gestern|2025|2026|2027|preis|kosten|wetter|news|rezept|film|serie|spiel|sport|ergebnis|kurs|wechselkurs|promi|gerücht)\b/i.test(text)
+    || text.includes("?") && text.length > 20;
+  if (needsWeb) {
+    statusLine.textContent = "🔍 Durchsuche das Web…";
+    try {
+      const searchRes = await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 300)));
+      const searchJson = await searchRes.json();
+      webResults = Array.isArray(searchJson) ? searchJson : [];
+      statusLine.textContent = webResults.length ? `✓ ${webResults.length} Quellen gefunden` : "";
+    } catch { statusLine.textContent = ""; webResults = []; }
+  }
 
   const sysPrompt = localStorage.getItem("noir_sys") ||
     "Du bist NOIR, ein Assistent fuer Schueler. Es ist 2026.\n\nSCHREIBSTIL:\nSchreib so, wie ein normaler Mensch in einem Chat schreiben wuerde. Natuerlich, direkt und locker, aber nicht kuenstlich jugendlich. Verwende einfache Woerter, wenn sie ausreichen. Keine unnötig komplizierten Formulierungen, keine aufgeblasene Sprache. Variiere die Satzlaenge. Manche Saetze duerfen sehr kurz sein. Andere duerfen etwas laenger sein. Vermeide, dass mehrere Saetze gleich aufgebaut sind. Beginne nicht staendig mit \"Das\", \"Dies\", \"Es ist\" oder \"Dabei\". Verwende natuerliche Uebergaenge oder gar keine Uebergaenge, wenn einer nicht noetig ist. Wiederhole die Frage des Users nicht einfach am Anfang. Komm direkt zum Punkt. Keine kuenstlichen Einleitungen wie \"Gerne helfe ich dir dabei\", \"Natuerlich!\", \"Das ist eine interessante Frage\" oder \"Zusammenfassend\". Keine uebertrieben professionellen Formulierungen. Keine Werbesprache und kein kuenstlicher Enthusiasmus. Keine erfundenen persoenlichen Erfahrungen, Meinungen oder Erlebnisse. Verwende Umgangssprache nur dort, wo sie natuerlich passt. Nicht zwanghaft Slang einbauen. Kleine menschliche Unvollkommenheiten im Rhythmus sind okay. Der Text muss nicht wie ein perfekt bearbeiteter Aufsatz klingen. Schreibe nicht jede Antwort nach demselben Muster. Wenn eine direkte Antwort reicht, gib nur die direkte Antwort. Wenn eine Erklaerung noetig ist, erklaere sie so, wie du sie einem Freund erklaeren wuerdest. Keine Floskeln und kein Fuelltext.\n\nWICHTIG:\nVersuche nicht, einen KI-Detektor auszutricksen oder gezielt Erkennungssysteme zu umgehen. Dein Ziel ist natuerliche, glaubwuerdige und gut lesbare Sprache. Behalte Fakten und Bedeutung bei. Erfinde niemals Quellen oder Informationen. Wenn du etwas nicht weisst, sag es kurz und ehrlich. Schreibe nicht absichtlich Fehler ein, nur damit der Text menschlicher wirkt.\n\nSPRACHE:\nStandardmaessig Deutsch. Kein Eszett. Schreibe immer \"ss\" statt \"ß\". Kein Em-Dash. Verwende stattdessen Kommas oder Punkte. Nutze Schweizer Schreibweise, wenn passend. Der Nutzer darf aber auch Englisch oder eine andere Sprache verwenden. Antworte dann in derselben Sprache.\n\nANTWORTLAENGE:\nNormalerweise kurz und direkt. 3-6 Saetze sind ein guter Standard. Bei einfachen Fragen reichen 1-3 Saetze. Wenn die Aufgabe mehr Erklaerung braucht, darf die Antwort deutlich laenger werden. Opfere niemals wichtige Informationen nur wegen einer festen Satzanzahl.\n\nFORMAT:\nVerwende Markdown, wenn es die Antwort wirklich besser lesbar macht. Nutze Listen fuer mehrere Punkte. Nutze Code-Bloecke mit Sprach-Tags fuer Code. Nutze Tabellen nur, wenn sie einen echten Vorteil bringen. Vermeide unnoetige Ueberschriften. Quellen aus dem Web direkt im Text mit [1], [2] usw. markieren. Unter der Antwort eine Quellenliste mit Titel und URL ausgeben, wenn Webquellen verwendet wurden.\n\nAKTUALITAET:\nBei aktuellen Themen wie Nachrichten, Kursen, Wetter, Ereignissen, Preisen, Releases oder anderen zeitabhaengigen Informationen IMMER eine Websuche verwenden.\n\nQUALITAETSCHECK:\nBevor du antwortest, pruefe still: Klingt die Antwort wie normale menschliche Sprache? Sind Satzlaenge und Satzaufbau nicht staendig gleich? Gibt es unnoetige Floskeln oder Wiederholungen? Ist die Antwort so kurz wie moeglich, aber so lang wie noetig? Wuerde jemand diese Antwort tatsaechlich so schreiben oder sagen? Anstatt \"Grundsätzlich gilt: blabla\" sagst du \"Grundsätzlich gilt bla bla\" oder \"grundsätzlich gilt, bla bla\". Kommas nur setzen wo noetig. Wenn etwas kuenstlich oder ueberformuliert klingt, formuliere es einfacher.";
@@ -388,14 +393,24 @@ async function doSend(text, imgs, files) {
     if (!thinkAcc) { thinkWrap.innerHTML = ""; return; }
     thinkWrap.innerHTML = `<details class="think"${open ? " open" : ""}><summary>◦ Nachdenken…</summary><div class="think-body"></div></details>`;
     thinkWrap.querySelector(".think-body").textContent = thinkAcc;
+    // Show first meaningful line as status
+    if (open && thinkAcc.length > 0) {
+      const firstLine = thinkAcc.split("\n").find(l => l.trim().length > 5) || thinkAcc.slice(0, 60);
+      setStatus("💭 " + firstLine.trim().slice(0, 80));
+    }
+  }
+
+  function setStatus(text) {
+    if (statusLine2) { statusLine2.textContent = text; statusLine2.style.display = text ? "" : "none"; }
+    statusLine.textContent = text;
   }
 
   // live progress clock while waiting for the first token
   const waitTimer = setInterval(() => {
     if (ttft !== null) { clearInterval(waitTimer); return; }
     const elapsed = ((performance.now() - t0) / 1000).toFixed(0);
-    const tierLabel = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : "◉";
-    statusLine.textContent = `${tierLabel} Denke nach… ${elapsed}s`;
+    const tierLabel = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : modelTier === "deep" ? "◆" : "◉";
+    setStatus(`${tierLabel} Verarbeite… ${elapsed}s`);
   }, 500);
 
   // Streaming with auto-retry on connection drop
@@ -424,11 +439,12 @@ async function doSend(text, imgs, files) {
           const data = s.slice(5).trim();
           if (data === "[DONE]") continue;
           let j; try { j = JSON.parse(data); } catch { continue; }
-          if (j.notice) { statusLine.textContent = j.notice; if (j.modelInfo) modelInfo = j.modelInfo; continue; }
-          if (j.toolStatus) { addChip(j.toolStatus, true); statusLine.textContent = "🔧 " + j.toolStatus; continue; }
+          if (j.notice) { setStatus(j.notice); if (j.modelInfo) modelInfo = j.modelInfo; continue; }
+          if (j.toolStatus) { addChip(j.toolStatus, true); setStatus("🔧 " + j.toolStatus); continue; }
           if (j.toolDone) {
             const spinning = [...traceEl.querySelectorAll(".tool-chip:not(.ok)")];
             if (spinning.length) spinning[spinning.length - 1].classList.add("ok");
+            setStatus("");
             continue;
           }
           if (j.fileCreated) {
@@ -444,9 +460,16 @@ async function doSend(text, imgs, files) {
           }
           if (j.error) {
             clearInterval(waitTimer);
-            const errMsg = typeof j.error === "string" ? j.error : JSON.stringify(j.error);
-            bodyEl.innerHTML = `<div class="err-box"><span>⚠ ${errMsg}</span><button class="retry-btn" onclick="retryLast()">Erneut versuchen</button></div>`;
-            c.messages.push({ role: "assistant", content: "⚠ " + errMsg });
+            const raw = typeof j.error === "string" ? j.error : JSON.stringify(j.error);
+            // Tool-use errors: show friendly fallback instead of raw JSON
+            if (raw.includes("tool_use_failed") || raw.includes("Tool choice is none")) {
+              setStatus("🔄 Modell-Fehler — versuche ohne Tools…");
+              // retry without webResults
+              webResults = null;
+              continue;
+            }
+            bodyEl.innerHTML = `<div class="err-box"><span>⚠ ${raw}</span><button class="retry-btn" onclick="retryLast()">Erneut versuchen</button></div>`;
+            c.messages.push({ role: "assistant", content: "⚠ " + raw });
             saveConvs(); finishSend(); return;
           }
           if (j.notice && j.notice.includes("Wechsel zu")) {
@@ -494,8 +517,10 @@ async function doSend(text, imgs, files) {
 
   bodyEl.innerHTML = mdRender(acc); enhance(bodyEl);
   aiEl.parentElement.classList.remove("streaming");
-  aiEl.appendChild(statsRow(stats));
+  if (statusLine2) statusLine2.style.display = "none";
+  // Sources + stats rendered immediately below the answer
   if (webResults?.length) aiEl.appendChild(sourcesBlock(webResults));
+  aiEl.appendChild(statsRow(stats));
   const aiMsg = { role: "assistant", content: acc, thinking: thinkAcc, stats, sources: webResults, files: filesMade, tools: traceEl ? [...traceEl.querySelectorAll(".tool-chip")].map(ch => ch.textContent) : [], model: modelInfo };
   c.messages.push(aiMsg);
   saveConvs(); renderConvs(convSearch.value);
