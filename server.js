@@ -323,7 +323,7 @@ async function handleChat(req, res) {
     try {
       const attempt = await fetch(up.url, {
         method: "POST", headers: up.headers,
-        body: JSON.stringify({ model: cand.id, messages, stream: true, reasoning_effort: "none" })
+        body: JSON.stringify({ model: cand.id, messages, stream: true, reasoning_effort: "low" })
       });
       if (attempt.ok) { ur = attempt; usedId = cand.id; break; }
       const t = await attempt.text().catch(() => "");
@@ -428,7 +428,7 @@ async function callModel(cfg, modelId, messages) {
     const up = upstreamFor(cfg, cand);
     if (!up) continue;
     try {
-      const r = await fetch(up.url, { method: "POST", headers: up.headers, body: JSON.stringify({ model: cand.id, messages, stream: false, reasoning_effort: "none" }) });
+      const r = await fetch(up.url, { method: "POST", headers: up.headers, body: JSON.stringify({ model: cand.id, messages, stream: false, reasoning_effort: "low" }) });
       if (r.ok) { const j = await r.json(); return j.choices[0].message.content || ""; }
       lastErr = "model " + r.status;
       if (!RETRYABLE.includes(r.status)) break;

@@ -135,9 +135,6 @@
     <button id="webBtn" class="icon-ghost" title="Web-Recherche">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
     </button>
-    <button id="agentBtn" class="icon-ghost" title="Agentenmodus — autonome Werkzeuge">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z"/><path d="M19 15l.9 2.6L22.5 18.5l-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z"/></svg>
-    </button>
     <textarea id="input" rows="1" placeholder="Frag mich alles"></textarea>
     <button id="voiceBtn" class="icon-ghost" title="Sprachmodus">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
@@ -169,7 +166,6 @@
     <span class="eyebrow" style="margin:16px 0 12px;display:block">BENUTZER</span>
     <label class="settings-toggle"><span>Automatisch vorlesen</span><input type="checkbox" id="settAutoRead"><span class="toggle-track"></span></label>
     <label class="settings-toggle"><span>Web-Recherche standardmässig aktivieren</span><input type="checkbox" id="settWebOn"><span class="toggle-track"></span></label>
-    <label class="settings-toggle"><span>Agentenmodus standardmässig aktivieren</span><input type="checkbox" id="settAgentOn"><span class="toggle-track"></span></label>
     <label>Systemaufforderung</label>
     <textarea id="sysInput" rows="5"></textarea>
     <div class="modal-actions">
@@ -185,7 +181,6 @@
     <div class="command-section">SCHNELLE AKTIONEN</div>
     <button class="command-item" data-command="new"><span class="command-icon">＋</span><span><strong>Neues Gespräch</strong><small>Mit sauberem Kontext starten</small></span><kbd>⌘ N</kbd></button>
     <button class="command-item" data-command="research"><span class="command-icon">⌕</span><span><strong>Recherchemodus</strong><small>Im Web suchen mit Quellenangaben</small></span><kbd>⌘ R</kbd></button>
-    <button class="command-item" data-command="agent"><span class="command-icon">✦</span><span><strong>Agentenmodus</strong><small>Planen und autonome Werkzeuge nutzen</small></span><kbd>⌘ A</kbd></button>
     <button class="command-item" data-command="settings"><span class="command-icon">⚙</span><span><strong>Einstellungen öffnen</strong><small>Modelle, Schlüssel und Systemaufforderung</small></span></button>
     <div id="commandResults"></div>
     <div class="command-footer"><span><b>↵</b> zum Auswählen</span><span><b>↑↓</b> zum Navigieren</span><span><b>ESC</b> zum Schließen</span></div>

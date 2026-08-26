@@ -2,14 +2,14 @@
 const $ = (s) => document.querySelector(s);
 const chatEl = $("#chat"), inputEl = $("#input"), sendBtn = $("#sendBtn");
 const convList = $("#convList"), titleEl = $("#title"), statusLine = $("#statusLine");
-const attachRow = $("#attachRow"), fileInput = $("#fileInput"), webBtn = $("#webBtn"), agentBtn = $("#agentBtn");
+const attachRow = $("#attachRow"), fileInput = $("#fileInput"), webBtn = $("#webBtn");
 const composerWrap = $("#composerWrap"), mainEl = $("#main");
 
 let MODELS = {};
 let conversations = JSON.parse(localStorage.getItem("noir_convs") || "[]");
 let currentId = null;
 let busy = false, aborter = null, lastModalTrigger = null;
-let pendingImgs = [], pendingFiles = [], webOn = false, agentOn = false;
+let pendingImgs = [], pendingFiles = [], webOn = false;
 let modelTier = localStorage.getItem("noir_tier") || "balanced";
 
 const currentConv = () => conversations.find(c => c.id === currentId);
@@ -89,14 +89,17 @@ function statsRow(s) {
 }
 function sourcesBlock(srcs) {
   const d = document.createElement("div"); d.className = "sources";
-  const title = document.createElement("div"); title.className = "sources-title"; title.textContent = `${srcs.length} QUELLE${srcs.length === 1 ? "" : "N"} ABGERUFEN`;
+  const title = document.createElement("div"); title.className = "sources-title"; title.textContent = `${srcs.length} QUELLE${srcs.length === 1 ? "" : "N"}`;
   d.appendChild(title);
+  const row = document.createElement("div"); row.className = "src-row";
   srcs.forEach((s, i) => {
-    const item = document.createElement("div"); item.className = "src";
-    const n = document.createElement("span"); n.className = "n"; n.textContent = String(i + 1).padStart(2, "0");
-    const a = document.createElement("a"); a.href = /^https?:\/\//i.test(s.url || "") ? s.url : "#"; a.target = "_blank"; a.rel = "noopener"; a.textContent = s.title || s.url || "Unbenannte Quelle";
-    item.append(n, a); d.appendChild(item);
+    const a = document.createElement("a"); a.className = "src-bubble"; a.href = /^https?:\/\//i.test(s.url || "") ? s.url : "#"; a.target = "_blank"; a.rel = "noopener";
+    const host = (() => { try { return new URL(s.url).hostname.replace("www.", ""); } catch { return "quelle"; } })();
+    const fav = document.createElement("img"); fav.className = "src-fav"; fav.src = `https://www.google.com/s2/favicons?domain=${host}&sz=32`; fav.onerror = () => fav.style.display = "none";
+    const span = document.createElement("span"); span.className = "src-name"; span.textContent = s.title || host;
+    a.append(fav, span); row.appendChild(a);
   });
+  d.appendChild(row);
   return d;
 }
 function addActions(el, m) {
@@ -317,7 +320,7 @@ async function doSend(text, imgs, files) {
   aborter = new AbortController();
 
   let webResults = null;
-  if (webOn && !agentOn) {
+  if (webOn) {
     statusLine.textContent = "🔍 Durchsuche das Web…";
     try {
       webResults = await (await fetch("/api/search?q=" + encodeURIComponent(text.slice(0, 300)))).json();
@@ -326,7 +329,7 @@ async function doSend(text, imgs, files) {
   } else statusLine.textContent = "";
 
   const sysPrompt = localStorage.getItem("noir_sys") ||
-    "Du bist NOIR, ein klarer und ehrlicher Privat-Assistent. Antworte kurz und direkt. Keine Em-Dashes, keine Umschweife. Erklaere Dinge einfach, wie einem Freund. Nutze Markdown, Code-Blöcke mit Sprach-Tags und Tabellen wenn sinnvoll. Bei unklaren Fragen erst kurz nachfragen. WICHTIG: Wenn du merkst, dass die Frage aktuelle oder zeitgebundene Informationen erfordert (z.B. aktuelle Kurse, Nachrichten, Release-Daten, Wetter, Ereignisse), froege IMMER nach ob der User eine Websuche moechte, oder schlage automatisch eine Websuche vor. Nutze dabei [n] Quellenangaben.";
+    "Du bist NOIR, ein Assistent fuer Schueler. Es ist 2026. Sprich wie ein 8. Klaessler: einfach, kurz, klar. Kein Em-Dash (---), kein Eszett (ss statt ß), keine langen Faecherpraesentationen. Schreib wie du redest. Wenn du Quellen aus dem Web hast, zitiere sie direkt mit [n] im Text und gib unten eine Quellenliste mit Titel + URL. Wenn die Frage aktuell ist (Kurse, Nachrichten, Wetter, Ereignisse), mach IMMER eine Websuche. Benutze Markdown: fettdruck, Listen, Code-Blöcke mit Sprach-Tags, Tabellen wenn sinnvoll. Antworte maximal 3-4 Sätze, es sei denn der User will mehr.";
 
   const apiMessages = [{ role: "system", content: sysPrompt },
     ...c.messages.map(m => ({ role: m.role, content: m.content }))];
@@ -355,14 +358,14 @@ async function doSend(text, imgs, files) {
     if (ttft !== null) { clearInterval(waitTimer); return; }
     const elapsed = ((performance.now() - t0) / 1000).toFixed(0);
     const tierLabel = modelTier === "fast" ? "⚡" : modelTier === "smart" ? "◈" : "◉";
-    statusLine.textContent = agentOn ? `${tierLabel} Agent arbeitet… ${elapsed}s` : `${tierLabel} Denke nach… ${elapsed}s`;
+    statusLine.textContent = `${tierLabel} Denke nach… ${elapsed}s`;
   }, 500);
 
   // Streaming with auto-retry on connection drop
   const MAX_STREAM_RETRY = 2;
   for (let attempt = 0; attempt <= MAX_STREAM_RETRY; attempt++) {
     try {
-      const res = await fetch(agentOn ? "/api/agent" : "/api/chat", {
+      const res = await fetch("/api/chat", {
         method: "POST", signal: aborter.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatModel: "auto", tier: modelTier, messages: apiMessages, images: imgsToSend, webResults })
@@ -699,10 +702,8 @@ inputEl.addEventListener("input", () => { localStorage.setItem("noir_draft", inp
 $("#newChatBtn").onclick = () => { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus();
   if (window.innerWidth <= 700) closeSidebar(); };
 $("#attachBtn").onclick = () => fileInput.click();
-webBtn.onclick = () => { webOn = !webOn; webBtn.classList.toggle("on", webOn); agentOn = false; agentBtn.classList.remove("on");
+webBtn.onclick = () => { webOn = !webOn; webBtn.classList.toggle("on", webOn);
   statusLine.textContent = webOn ? "Web-Recherche aktiviert" : ""; };
-agentBtn.onclick = () => { agentOn = !agentOn; agentBtn.classList.toggle("on", agentOn); webOn = false; webBtn.classList.remove("on");
-  statusLine.textContent = agentOn ? "Agentenmodus — Ich kann suchen, Seiten lesen & rechnen" : ""; };
 
 let toastTimer;
 function toast(msg) {
@@ -776,7 +777,7 @@ function runCommand(command) {
   closeCommand();
   if (command === "new") { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus(); }
   if (command === "research") { if (!webOn) webBtn.click(); inputEl.focus(); }
-  if (command === "agent") { if (!agentOn) agentBtn.click(); inputEl.focus(); }
+  if (command === "research") { if (!webOn) webBtn.click(); inputEl.focus(); }
   if (command === "settings") $("#settingsBtn").click();
 }
 $("#commandBtn").onclick = openCommand;
@@ -838,7 +839,7 @@ $("#saveSettings").onclick = async () => {
   localStorage.setItem("noir_agent_default", $("#settAgentOn").checked ? "true" : "false");
   autoRead = $("#settAutoRead").checked;
   if ($("#settWebOn").checked && !webOn) { webOn = true; webBtn.classList.add("on"); }
-  if ($("#settAgentOn").checked && !agentOn) { agentOn = true; agentBtn.classList.add("on"); webOn = false; webBtn.classList.remove("on"); }
+  if ($("#settAgentOn") && $("#settAgentOn").checked) { webOn = true; webBtn.classList.add("on"); }
   closeSettings(); loadModels();
 };
 
@@ -864,7 +865,7 @@ function initNoir() {
   inputEl.value = localStorage.getItem("noir_draft") || ""; autosize();
   autoRead = localStorage.getItem("noir_autoread") === "true";
   if (localStorage.getItem("noir_web_default") === "true") { webOn = true; webBtn.classList.add("on"); statusLine.textContent = "Web-Recherche aktiviert"; }
-  if (localStorage.getItem("noir_agent_default") === "true") { agentOn = true; agentBtn.classList.add("on"); webOn = false; webBtn.classList.remove("on"); statusLine.textContent = "Agentenmodus aktiviert"; }
+  if (localStorage.getItem("noir_agent_default") === "true") { webOn = true; webBtn.classList.add("on"); statusLine.textContent = "Web-Recherche aktiviert"; }
   loadModels().then(renderChat).catch(() => toast("Lokaler Modelldienst nicht erreichbar"));
   renderConvs();
   applyProfile();
