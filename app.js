@@ -11,6 +11,7 @@ let currentId = null;
 let busy = false, aborter = null, lastModalTrigger = null;
 let pendingImgs = [], pendingFiles = [], webOn = false;
 let modelTier = localStorage.getItem("noir_tier") || "balanced";
+let lastSendText = "", lastSendImgs = [], lastSendFiles = [];
 
 const currentConv = () => conversations.find(c => c.id === currentId);
 const saveConvs = () => localStorage.setItem("noir_convs", JSON.stringify(conversations));
@@ -41,6 +42,34 @@ function enhance(el) {
   });
 }
 const mdRender = (t) => DOMPurify.sanitize(marked.parse(t || "", { breaks: true, gfm: true }));
+
+function streamSafe(text) {
+  const lines = text.split("\n");
+  let inCode = false;
+  let safe = [];
+  let incomplete = [];
+  for (const line of lines) {
+    if (line.trimStart().startsWith("```")) {
+      if (!inCode) { inCode = true; safe.push(line); }
+      else { inCode = false; safe.push(line); }
+    } else if (inCode) {
+      safe.push(line);
+    } else {
+      incomplete.push(line);
+    }
+  }
+  const joined = safe.join("\n");
+  const tail = incomplete.join("\n");
+  if (inCode) return joined + "\n" + tail;
+  const openBold = (tail.match(/\*\*/g) || []).length % 2;
+  const openItalic = (tail.match(/(?<!\*)\*(?!\*)/g) || []).length % 2;
+  const openCode = (tail.match(/`/g) || []).length % 2;
+  let clean = tail;
+  if (openBold) clean = clean.replace(/\*\*[^*]*$/, "");
+  if (openItalic) clean = clean.replace(/(?<!\*)\*[^*]*$/, "");
+  if (openCode) clean = clean.replace(/`[^`]*$/, "");
+  return joined + (joined && clean ? "\n" : "") + clean;
+}
 
 /* ---------------- layout ---------------- */
 function isHero() { const c = currentConv(); return !c || !c.messages.length; }
@@ -133,7 +162,15 @@ function renderChat() {
   const c = currentConv();
   titleEl.textContent = c ? c.title : "";
   const contextBadge = $("#contextBadge");
-  if (c?.messages?.length) { contextBadge.textContent = `${c.messages.length} Nachrichten`; contextBadge.classList.remove("hidden"); }
+  if (c?.messages?.length) {
+    const msgCount = c.messages.length;
+    const charCount = c.messages.reduce((s, m) => s + (m.content || "").length, 0);
+    const estTokens = Math.round(charCount / 4);
+    const warn = estTokens > 28000;
+    contextBadge.textContent = `${msgCount} Nachrichten · ~${estTokens > 1000 ? (estTokens/1000).toFixed(1) + 'k' : estTokens} Tokens`;
+    contextBadge.classList.toggle("context-warn", warn);
+    contextBadge.classList.remove("hidden");
+  }
   else contextBadge.classList.add("hidden");
   if (!c || !c.messages.length) {
     chatEl.innerHTML = `<div class="hero">
@@ -143,10 +180,10 @@ function renderChat() {
       <div id="heroSlot" style="width:100%;display:flex;justify-content:center"></div>
       <div class="hero-hint"><span>⌘ K</span> Befehlspalette <b>·</b> <span>↵</span> Senden <b>·</b> <span>⇧ ↵</span> Neue Zeile</div>
       <div class="sugg-row">
+        <button class="sugg" data-p="Erklaere mir Quantencomputer in 5 Saetzen"><div class="bg" style="background-image:url('assets/hero2.jpg')"></div><div class="fg"><div class="t">◈ Etwas erklaeren</div><div class="d">Einfach und verstaendlich</div></div></button>
+        <button class="sugg" data-p="Hilf mir beim Lernen fuer "><div class="bg" style="background-image:url('assets/hero3.jpg')"></div><div class="fg"><div class="t">⌗ Lernen vorbereiten</div><div class="d">Fach, Themen, Zusammenfassung</div></div></button>
+        <button class="sugg" data-p="Schreib mir eine E-Mail an "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">▤ E-Mail schreiben</div><div class="d">Professionell oder locker</div></div></button>
         <button class="sugg" data-p="Recherchiere die neuesten Entwicklungen in "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">⌕ Tiefenrecherche</div><div class="d">Live-Web + Quellenangaben</div></div></button>
-        <button class="sugg" data-p="Erkläre es mir wie einem 15-Jährigen: "><div class="bg" style="background-image:url('assets/hero2.jpg')"></div><div class="fg"><div class="t">◈ Alles erklären</div><div class="d">Klare, einfache Antworten</div></div></button>
-        <button class="sugg" data-p="Schreib ein Python-Skript das "><div class="bg" style="background-image:url('assets/hero3.jpg')"></div><div class="fg"><div class="t">⌗ Code bauen</div><div class="d">Funktionierende Skripte, schnell</div></div></button>
-        <button class="sugg" data-p="Analysiere dieses Dokument: "><div class="bg" style="background-image:url('assets/hero1.jpg')"></div><div class="fg"><div class="t">▤ Mein PDF lesen</div><div class="d">Anhängen & alles fragen</div></div></button>
       </div></div>`;
     chatEl.querySelectorAll(".sugg").forEach(b => b.onclick = () => { inputEl.value = b.dataset.p; inputEl.focus(); autosize(); });
   } else {
@@ -408,9 +445,13 @@ async function doSend(text, imgs, files) {
           if (j.error) {
             clearInterval(waitTimer);
             const errMsg = typeof j.error === "string" ? j.error : JSON.stringify(j.error);
-            bodyEl.innerHTML = `<div class="err-box">⚠ ${errMsg}</div>`;
+            bodyEl.innerHTML = `<div class="err-box"><span>⚠ ${errMsg}</span><button class="retry-btn" onclick="retryLast()">Erneut versuchen</button></div>`;
             c.messages.push({ role: "assistant", content: "⚠ " + errMsg });
             saveConvs(); finishSend(); return;
+          }
+          if (j.notice && j.notice.includes("Wechsel zu")) {
+            toast("🔄 " + j.notice);
+            modelInfo = j.modelInfo || { label: j.notice.replace("Wechsel zu ", "") };
           }
           const think = j.choices?.[0]?.delta?.reasoning || "";
           if (think) {
@@ -425,7 +466,7 @@ async function doSend(text, imgs, files) {
             chunks++;
             acc += piece;
             renderThink(false);
-            bodyEl.innerHTML = mdRender(acc) + `<span class="cursor">▋</span>`;
+            bodyEl.innerHTML = mdRender(streamSafe(acc)) + `<span class="cursor">▋</span>`;
             enhance(bodyEl);
             chatEl.scrollTop = chatEl.scrollHeight;
           }
@@ -490,9 +531,19 @@ function send() {
   const text = inputEl.value.trim();
   if ((!text && !pendingImgs.length && !pendingFiles.length) || busy) return;
   const imgs = pendingImgs, files = pendingFiles;
+  lastSendText = text; lastSendImgs = [...imgs]; lastSendFiles = [...files];
   pendingImgs = []; pendingFiles = []; renderChips();
   inputEl.value = ""; localStorage.removeItem("noir_draft"); autosize();
   doSend(text, imgs, files);
+}
+
+function retryLast() {
+  if (busy) return;
+  const c = currentConv();
+  if (c && c.messages.length && c.messages[c.messages.length - 1].role === "assistant") {
+    c.messages.pop(); saveConvs(); renderChat();
+  }
+  doSend(lastSendText, lastSendImgs, lastSendFiles);
 }
 
 function regenerate() {
@@ -627,9 +678,16 @@ voiceBtn.onclick = () => {
 };
 
 let autoRead = localStorage.getItem("noir_autoread") === "true";
+let fontSize = parseInt(localStorage.getItem("noir_fontsize") || "15", 10);
+
+function applyFontSize() {
+  document.documentElement.style.setProperty("--chat-font", fontSize + "px");
+  const val = $("#fontSizeVal"); if (val) val.textContent = fontSize;
+}
+applyFontSize();
 
 /* ---------------- model tier dropdown (composer) ---------------- */
-const TIERS = { fast: { icon: "⚡", label: "Schnell" }, balanced: { icon: "◉", label: "Balanciert" }, smart: { icon: "◈", label: "Schlau" } };
+const TIERS = { fast: { icon: "⚡", label: "Schnell" }, balanced: { icon: "◉", label: "Balanciert" }, smart: { icon: "◈", label: "Schlau" }, deep: { icon: "◆", label: "Deep" } };
 const tierMenu = $("#modelMenu"), tierLabel = $("#tierLabel"), tierIcon = $("#tierIcon"), pickerWrap = $("#modelPickerWrap");
 function syncTierUI() {
   if (!tierLabel) return;
@@ -778,7 +836,8 @@ function runCommand(command) {
   closeCommand();
   if (command === "new") { currentId = null; renderChat(); renderConvs(convSearch.value); inputEl.focus(); }
   if (command === "research") { if (!webOn) webBtn.click(); inputEl.focus(); }
-  if (command === "research") { if (!webOn) webBtn.click(); inputEl.focus(); }
+  if (command === "deep") { modelTier = "deep"; localStorage.setItem("noir_tier", modelTier); syncTierUI(); toast("◆ Deep Mode aktiviert"); }
+  if (command === "export") $("#exportBtn").click();
   if (command === "settings") $("#settingsBtn").click();
 }
 $("#commandBtn").onclick = openCommand;
@@ -796,7 +855,10 @@ document.addEventListener("keydown", e => {
   if (meta && e.key.toLowerCase() === "k") { e.preventDefault(); commandModal.classList.contains("hidden") ? openCommand(document.activeElement) : closeCommand(); }
   if (meta && e.key.toLowerCase() === "n") { e.preventDefault(); runCommand("new"); }
   if (meta && e.key.toLowerCase() === "r") { e.preventDefault(); runCommand("research"); }
-  if (meta && e.key.toLowerCase() === "a") { e.preventDefault(); runCommand("agent"); }
+  if (meta && e.key.toLowerCase() === "d") { e.preventDefault(); runCommand("deep"); }
+  if (meta && e.key.toLowerCase() === "e") { e.preventDefault(); runCommand("export"); }
+  if (meta && e.key === ",") { e.preventDefault(); $("#settingsBtn").click(); }
+  if (meta && e.key === "/") { e.preventDefault(); inputEl.focus(); }
   if (e.key === "Escape" && !commandModal.classList.contains("hidden")) closeCommand();
 });
 
@@ -808,6 +870,8 @@ $("#settingsBtn").onclick = async () => {
   $("#sysInput").value = localStorage.getItem("noir_sys") || "";
   $("#settAutoRead").checked = localStorage.getItem("noir_autoread") === "true";
   $("#settWebOn").checked = localStorage.getItem("noir_web_default") === "true";
+  $("#fontSizeRange").value = fontSize;
+  $("#fontSizeVal").textContent = fontSize;
   $("#settAgentOn").checked = localStorage.getItem("noir_agent_default") === "true";
   const cfg = await (await fetch("/api/config")).json();
   if (cfg.hasKey) $("#keyInput").placeholder = "Gespeichert — leer lassen zum Behalten";
@@ -837,6 +901,9 @@ $("#saveSettings").onclick = async () => {
   localStorage.setItem("noir_sys", $("#sysInput").value.trim());
   localStorage.setItem("noir_autoread", $("#settAutoRead").checked ? "true" : "false");
   localStorage.setItem("noir_web_default", $("#settWebOn").checked ? "true" : "false");
+  localStorage.setItem("noir_fontsize", $("#fontSizeRange").value);
+  fontSize = parseInt($("#fontSizeRange").value, 10);
+  applyFontSize();
   localStorage.setItem("noir_agent_default", $("#settAgentOn").checked ? "true" : "false");
   autoRead = $("#settAutoRead").checked;
   if ($("#settWebOn").checked && !webOn) { webOn = true; webBtn.classList.add("on"); }

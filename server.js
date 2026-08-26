@@ -280,6 +280,14 @@ function pickAuto(cfg, body, mode) {
     if (has("gem35")) return "gem35";
     return "groq20";
   }
+  if (tier === "deep") {
+    // Deep: maximale Qualität, Tempo egal
+    if (has("gem37")) return "gem37";
+    if (has("glm")) return "glm";
+    if (has("groq120")) return "groq120";
+    if (has("gem35")) return "gem35";
+    return "groq20";
+  }
   // Balanciert: mix aus speed + quality
   if (has("groq120")) return "groq120";
   if (has("groq20")) return "groq20";
@@ -370,7 +378,8 @@ async function handleChat(req, res) {
     res.write(`data: ${JSON.stringify({ notice: autoNote, modelInfo: { label: modelLabel, provider: modelProvider } })}\n\n`);
   }
   if (usedId !== m.id) {
-    res.write(`data: ${JSON.stringify({ notice: "Wechsel zu " + usedId })}\n\n`);
+    const fallbackLabel = cfg.models[usedId]?.label || usedId;
+    res.write(`data: ${JSON.stringify({ notice: "Wechsel zu " + fallbackLabel })}\n\n`);
   }
   const reader = ur.body.getReader();
   try { for (;;) { const { done, value } = await reader.read(); if (done) break; res.write(Buffer.from(value)); } } catch {}
@@ -555,10 +564,10 @@ async function handleTitle(req, res) {
     const anyCloudKey = Object.values(cfg.providers || {}).some(p => p && p.key);
     if (anyCloudKey) {
       const out = await callModel(cfg, cfg.titleModel || "openrouter|nvidia/nemotron-3.5-lightning:free", [
-        { role: "system", content: "Erstelle einen 2-5 woertigen Titel fuer dieses Gespraech. Antworte NUR mit dem Titel, keine Anfuehrungszeichen, kein Satzzeichen am Ende. Sprache wie der User." },
+        { role: "system", content: "Gib diesem Gespräch einen kurzen, prägnanten Titel (max. 4 Wörter). Der Titel soll das Hauptthema erfassen. Antworte NUR mit dem Titel, keine Anführungszeichen, kein Satzzeichen am Ende. Sprache wie der User." },
         { role: "user", content: text }
       ]);
-      title = out.replace(/["'.]/g, "").trim().slice(0, 48);
+      title = out.replace(/^["']+|["']+$/g, "").trim().slice(0, 48);
     }
     if (!title) title = (body.fallback || "new chat").slice(0, 40);
     res.writeHead(200, { "Content-Type": "application/json" });

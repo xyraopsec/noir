@@ -125,6 +125,7 @@
         <button class="menu-item" data-tier="fast"><span class="l">⚡ Schnell <span class="check"></span></span><span class="s">~500 Tok/s — Groq</span></button>
         <button class="menu-item" data-tier="balanced"><span class="l">◉ Balanciert <span class="check"></span></span><span class="s">Speed + Klugheit</span></button>
         <button class="menu-item" data-tier="smart"><span class="l">◈ Schlau <span class="check"></span></span><span class="s">Beste Qualität — Gemini</span></button>
+        <button class="menu-item" data-tier="deep"><span class="l">◆ Deep <span class="check"></span></span><span class="s">Max. Qualität — bringt Zeit mit</span></button>
       </div>
     </div>
   </div>
@@ -166,6 +167,8 @@
     <span class="eyebrow" style="margin:16px 0 12px;display:block">BENUTZER</span>
     <label class="settings-toggle"><span>Automatisch vorlesen</span><input type="checkbox" id="settAutoRead"><span class="toggle-track"></span></label>
     <label class="settings-toggle"><span>Web-Recherche standardmässig aktivieren</span><input type="checkbox" id="settWebOn"><span class="toggle-track"></span></label>
+    <label>Schriftgrösse: <span id="fontSizeVal">15</span>px</label>
+    <input type="range" id="fontSizeRange" min="12" max="20" value="15" step="1" style="width:100%">
     <label>Systemaufforderung</label>
     <textarea id="sysInput" rows="5"></textarea>
     <div class="modal-actions">
@@ -180,8 +183,10 @@
     <div class="command-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="commandInput" placeholder="Befehl eingeben oder Chats suchen" autocomplete="off"><kbd>ESC</kbd></div>
     <div class="command-section">SCHNELLE AKTIONEN</div>
     <button class="command-item" data-command="new"><span class="command-icon">＋</span><span><strong>Neues Gespräch</strong><small>Mit sauberem Kontext starten</small></span><kbd>⌘ N</kbd></button>
+    <button class="command-item" data-command="deep"><span class="command-icon">◆</span><span><strong>Deep Mode</strong><small>Maximales Modell für schwierige Fragen</small></span><kbd>⌘ D</kbd></button>
     <button class="command-item" data-command="research"><span class="command-icon">⌕</span><span><strong>Recherchemodus</strong><small>Im Web suchen mit Quellenangaben</small></span><kbd>⌘ R</kbd></button>
-    <button class="command-item" data-command="settings"><span class="command-icon">⚙</span><span><strong>Einstellungen öffnen</strong><small>Modelle, Schlüssel und Systemaufforderung</small></span></button>
+    <button class="command-item" data-command="export"><span class="command-icon">⇩</span><span><strong>Als Markdown exportieren</strong><small>Chat-Verlauf herunterladen</small></span><kbd>⌘ E</kbd></button>
+    <button class="command-item" data-command="settings"><span class="command-icon">⚙</span><span><strong>Einstellungen öffnen</strong><small>Modelle, Schlüssel und Systemaufforderung</small></span><kbd>⌘ ,</kbd></button>
     <div id="commandResults"></div>
     <div class="command-footer"><span><b>↵</b> zum Auswählen</span><span><b>↑↓</b> zum Navigieren</span><span><b>ESC</b> zum Schließen</span></div>
   </div>
